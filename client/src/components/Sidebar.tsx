@@ -9,6 +9,7 @@ export default function Sidebar() {
   const navItems = [
     { href: "/", label: "Agenda", icon: Calendar },
     { href: "/clientes", label: "Clientes", icon: Users },
+    { href: "/profissionais", label: "Profissionais", icon: Users },
     { href: "/servicos", label: "Serviços", icon: Scissors },
   ];
 
