@@ -11,6 +11,7 @@ interface Profissional {
   especialidade: string;
   telefone: string;
   email: string;
+  cidade: string;
   status: "ativo" | "inativo";
 }
 
@@ -22,6 +23,7 @@ export default function Profissionais() {
       especialidade: "Micropigmentação",
       telefone: "(11) 98765-4321",
       email: "ana@estetica.com",
+      cidade: "São Paulo",
       status: "ativo",
     },
     {
@@ -30,6 +32,7 @@ export default function Profissionais() {
       especialidade: "Botox e Preenchimento",
       telefone: "(11) 99876-5432",
       email: "carla@estetica.com",
+      cidade: "São Paulo",
       status: "ativo",
     },
     {
@@ -38,6 +41,7 @@ export default function Profissionais() {
       especialidade: "Limpeza de Pele",
       telefone: "(11) 97654-3210",
       email: "marina@estetica.com",
+      cidade: "Guarulhos",
       status: "inativo",
     },
   ]);
@@ -50,12 +54,14 @@ export default function Profissionais() {
     especialidade: string;
     telefone: string;
     email: string;
+    cidade: string;
     status: "ativo" | "inativo";
   }>({
     nome: "",
     especialidade: "",
     telefone: "",
     email: "",
+    cidade: "",
     status: "ativo",
   });
 
@@ -65,7 +71,7 @@ export default function Profissionais() {
   );
 
   const handleAddProfissional = () => {
-    if (formData.nome && formData.especialidade && formData.telefone) {
+    if (formData.nome && formData.especialidade && formData.telefone && formData.cidade) {
       if (editingId) {
         setProfissionais(
           profissionais.map((p) =>
@@ -82,11 +88,12 @@ export default function Profissionais() {
           },
         ]);
       }
-      setFormData({
+        setFormData({
         nome: "",
         especialidade: "",
         telefone: "",
         email: "",
+        cidade: "",
         status: "ativo",
       });
       setShowForm(false);
@@ -99,6 +106,7 @@ export default function Profissionais() {
       especialidade: profissional.especialidade,
       telefone: profissional.telefone,
       email: profissional.email,
+      cidade: profissional.cidade,
       status: profissional.status,
     });
     setEditingId(profissional.id);
@@ -132,6 +140,7 @@ export default function Profissionais() {
                   especialidade: "",
                   telefone: "",
                   email: "",
+                  cidade: "",
                   status: "ativo",
                 });
                 setShowForm(!showForm);
@@ -215,6 +224,22 @@ export default function Profissionais() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-foreground">
+                      Cidade *
+                    </label>
+                    <Input
+                      placeholder="São Paulo"
+                      value={formData.cidade}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          cidade: e.target.value,
+                        })
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground">
                       Status
                     </label>
                     <select
@@ -240,13 +265,14 @@ export default function Profissionais() {
                       onClick={() => {
                         setShowForm(false);
                         setEditingId(null);
-                        setFormData({
-                          nome: "",
-                          especialidade: "",
-                          telefone: "",
-                          email: "",
-                          status: "ativo" as const,
-                        });
+                setFormData({
+                  nome: "",
+                  especialidade: "",
+                  telefone: "",
+                  email: "",
+                  cidade: "",
+                  status: "ativo" as const,
+                });
                       }}
                     >
                       Cancelar
@@ -297,13 +323,13 @@ export default function Profissionais() {
                           <div className="text-sm text-muted-foreground space-x-3">
                             <span>{profissional.especialidade}</span>
                             <span>•</span>
-                            <span>{profissional.telefone}</span>
+                            <span>{profissional.cidade}</span>
                           </div>
-                          {profissional.email && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {profissional.email}
-                            </p>
-                          )}
+                          <div className="text-xs text-muted-foreground mt-1 space-x-2">
+                            {profissional.telefone && <span>{profissional.telefone}</span>}
+                            {profissional.email && <span>•</span>}
+                            {profissional.email && <span>{profissional.email}</span>}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
