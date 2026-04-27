@@ -11,6 +11,7 @@ export default function Sidebar() {
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/profissionais", label: "Profissionais", icon: Users },
     { href: "/servicos", label: "Serviços", icon: Scissors },
+    { href: "/profissional-servicos", label: "Associações", icon: Scissors },
   ];
 
   return (
