@@ -11,8 +11,8 @@ import Profissionais from "./pages/Profissionais";
 import ProfissionalServicos from "./pages/ProfissionalServicos";
 import Agendamento from "./pages/Agendamento";
 
-
 function Router() {
+  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path={"/"} component={Dashboard} />
