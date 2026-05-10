@@ -1,183 +1,201 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Plus, Users, Scissors, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Calendar, Plus, Users, Scissors, Clock, Loader2, UserCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
-import Sidebar from "@/components/Sidebar";
-
-interface Agendamento {
-  id: string;
-  cliente: string;
-  servico: string;
-  data: string;
-  hora: string;
-  duracao: number;
-}
+import { trpc } from "@/lib/trpc";
+import DashboardLayout from "@/components/DashboardLayout";
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const [agendamentos] = useState<Agendamento[]>([
-    {
-      id: "1",
-      cliente: "Maria Silva",
-      servico: "Limpeza de Pele",
-      data: "2026-04-27",
-      hora: "09:00",
-      duracao: 60,
-    },
-    {
-      id: "2",
-      cliente: "João Santos",
-      servico: "Micropigmentação",
-      data: "2026-04-27",
-      hora: "10:30",
-      duracao: 90,
-    },
-    {
-      id: "3",
-      cliente: "Ana Costa",
-      servico: "Botox",
-      data: "2026-04-27",
-      hora: "14:00",
-      duracao: 30,
-    },
-  ]);
+  const [dataSelecionada, setDataSelecionada] = useState(() => {
+    const hoje = new Date();
+    return hoje.toISOString().split("T")[0];
+  });
 
-  const [currentDate] = useState(new Date("2026-04-27"));
-  const agendamentosHoje = agendamentos.filter(
-    (a) => a.data === currentDate.toISOString().split("T")[0]
-  );
+  const { data: agendamentos = [], isLoading: loadingAg } = trpc.agendamentos.list.useQuery();
+  const { data: stats } = trpc.agendamentos.dashboard.useQuery();
+  const { data: clientes = [] } = trpc.clientes.list.useQuery();
+  const { data: servicos = [] } = trpc.servicos.list.useQuery();
+  const { data: profissionais = [] } = trpc.profissionais.list.useQuery();
+
+  const agendamentosDoDia = agendamentos.filter((a) => {
+    const dataAg = new Date(a.dataHora).toISOString().split("T")[0];
+    return dataAg === dataSelecionada;
+  }).sort((a, b) => new Date(a.dataHora).getTime() - new Date(b.dataHora).getTime());
+
+  const mudarDia = (delta: number) => {
+    const d = new Date(dataSelecionada + "T12:00:00");
+    d.setDate(d.getDate() + delta);
+    setDataSelecionada(d.toISOString().split("T")[0]);
+  };
+
+  const hoje = new Date().toISOString().split("T")[0];
+  const dataFormatada = new Date(dataSelecionada + "T12:00:00").toLocaleDateString("pt-BR", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "confirmado": return "default";
+      case "concluido": return "secondary";
+      case "cancelado": return "destructive";
+      default: return "outline";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "confirmado": return "Confirmado";
+      case "concluido": return "Concluído";
+      case "cancelado": return "Cancelado";
+      default: return status;
+    }
+  };
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <div className="flex-1 overflow-auto">
-        <div className="p-8 max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-foreground mb-2">Minha Agenda</h1>
-            <p className="text-muted-foreground">
-              {currentDate.toLocaleDateString("pt-BR", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </p>
+    <DashboardLayout>
+      <div className="p-6 max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="mb-6 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-1">Minha Agenda</h1>
+            <p className="text-muted-foreground capitalize">{dataFormatada}</p>
           </div>
+          <Button onClick={() => navigate("/agendamento")} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Novo Agendamento
+          </Button>
+        </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  Agendamentos Hoje
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">
-                  {agendamentosHoje.length}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Clientes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">12</div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Scissors className="w-4 h-4" />
-                  Serviços
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">5</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Agenda do Dia */}
-          <Card className="border-border bg-card mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                Agenda de Hoje
+        {/* Cards de Estatísticas */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Clock className="w-4 h-4" /> Agendamentos Hoje
               </CardTitle>
-              <CardDescription>Seus compromissos para o dia</CardDescription>
             </CardHeader>
             <CardContent>
-              {agendamentosHoje.length > 0 ? (
-                <div className="space-y-4">
-                  {agendamentosHoje.map((agendamento) => (
-                    <div
-                      key={agendamento.id}
-                      className="flex items-center justify-between p-4 bg-background rounded-lg border border-border hover:bg-muted transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="text-lg font-semibold text-primary">
-                            {agendamento.hora}
-                          </div>
-                          <div>
-                            <p className="font-medium text-foreground">
-                              {agendamento.cliente}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {agendamento.servico} • {agendamento.duracao} min
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        Editar
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-4">Nenhum agendamento para hoje</p>
-                  <Button onClick={() => navigate("/agendamento")} className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Novo Agendamento
-                  </Button>
-                </div>
-              )}
+              <div className="text-3xl font-bold">
+                {agendamentos.filter(a => new Date(a.dataHora).toISOString().split("T")[0] === hoje).length}
+              </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Users className="w-4 h-4" /> Clientes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{clientes.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Scissors className="w-4 h-4" /> Serviços
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{servicos.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <UserCheck className="w-4 h-4" /> Profissionais
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{profissionais.filter(p => p.ativo).length}</div>
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* Ações Rápidas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button
-              onClick={() => navigate("/clientes")}
-              variant="outline"
-              className="h-12 text-base gap-2"
-            >
-              <Users className="w-5 h-5" />
-              Gerenciar Clientes
-            </Button>
-            <Button
-              onClick={() => navigate("/servicos")}
-              variant="outline"
-              className="h-12 text-base gap-2"
-            >
-              <Scissors className="w-5 h-5" />
-              Gerenciar Serviços
-            </Button>
-          </div>
+        {/* Navegação de Data */}
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  Agenda do Dia
+                </CardTitle>
+                <CardDescription>{agendamentosDoDia.length} agendamento(s)</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => mudarDia(-1)}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setDataSelecionada(hoje)}>
+                  Hoje
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => mudarDia(1)}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingAg ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : agendamentosDoDia.length > 0 ? (
+              <div className="space-y-3">
+                {agendamentosDoDia.map((ag) => {
+                  const dataHora = new Date(ag.dataHora);
+                  const hora = dataHora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                  return (
+                    <div key={ag.id}
+                      className="flex items-center justify-between p-4 bg-background rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="text-lg font-bold text-primary min-w-[50px]">{hora}</div>
+                        <div>
+                          <p className="font-medium text-foreground">{ag.clienteNome ?? "—"}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {ag.servicoNome ?? "—"} • {ag.duracao} min
+                            {ag.profissionalNome && ` • ${ag.profissionalNome}`}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={getStatusColor(ag.status) as any}>
+                        {getStatusLabel(ag.status)}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-muted-foreground mb-4">Nenhum agendamento para este dia.</p>
+                <Button onClick={() => navigate("/agendamento")} className="gap-2">
+                  <Plus className="w-4 h-4" /> Novo Agendamento
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Ações Rápidas */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Button variant="outline" onClick={() => navigate("/clientes")} className="h-12 gap-2">
+            <Users className="w-4 h-4" /> Clientes
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/profissionais")} className="h-12 gap-2">
+            <UserCheck className="w-4 h-4" /> Profissionais
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/servicos")} className="h-12 gap-2">
+            <Scissors className="w-4 h-4" /> Serviços
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/agendamento")} className="h-12 gap-2">
+            <Calendar className="w-4 h-4" /> Agendar
+          </Button>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
