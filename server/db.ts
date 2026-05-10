@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, clientes, InsertCliente, profissionais, InsertProfissional, servicos, InsertServico, agendamentos, InsertAgendamento, profissionalServicos } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -236,4 +236,102 @@ export async function removerServicoFromProfissional(profissionalId: number, ser
   return await db.delete(profissionalServicos).where(
     and(eq(profissionalServicos.profissionalId, profissionalId), eq(profissionalServicos.servicoId, servicoId))
   );
+}
+
+// Verificar conflito de horário para um profissional
+export async function verificarConflitoHorario(
+  profissionalId: number,
+  dataHora: Date,
+  duracao: number,
+  excludeId?: number
+) {
+  const db = await getDb();
+  if (!db) return false;
+
+  const novoInicio = dataHora.getTime();
+  const novoFim = novoInicio + duracao * 60 * 1000;
+
+  const agendamentosExistentes = await db
+    .select()
+    .from(agendamentos)
+    .where(
+      and(
+        eq(agendamentos.profissionalId, profissionalId),
+        eq(agendamentos.status, "confirmado")
+      )
+    );
+
+  for (const ag of agendamentosExistentes) {
+    if (excludeId && ag.id === excludeId) continue;
+    const existInicio = ag.dataHora.getTime();
+    const existFim = existInicio + ag.duracao * 60 * 1000;
+    // Verifica sobreposição
+    if (novoInicio < existFim && novoFim > existInicio) {
+      return true; // Conflito encontrado
+    }
+  }
+  return false;
+}
+
+// Buscar agendamentos com dados completos (JOIN)
+export async function getAllAgendamentosCompletos() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db
+    .select({
+      id: agendamentos.id,
+      dataHora: agendamentos.dataHora,
+      duracao: agendamentos.duracao,
+      status: agendamentos.status,
+      notas: agendamentos.notas,
+      createdAt: agendamentos.createdAt,
+      updatedAt: agendamentos.updatedAt,
+      clienteId: agendamentos.clienteId,
+      profissionalId: agendamentos.profissionalId,
+      servicoId: agendamentos.servicoId,
+      clienteNome: clientes.nome,
+      clienteTelefone: clientes.telefone,
+      profissionalNome: profissionais.nome,
+      profissionalEspecialidade: profissionais.especialidade,
+      servicoNome: servicos.nome,
+      servicoValor: servicos.valor,
+    })
+    .from(agendamentos)
+    .leftJoin(clientes, eq(agendamentos.clienteId, clientes.id))
+    .leftJoin(profissionais, eq(agendamentos.profissionalId, profissionais.id))
+    .leftJoin(servicos, eq(agendamentos.servicoId, servicos.id));
+
+  return result;
+}
+
+// Estatísticas para o dashboard
+export async function getDashboardStats() {
+  const db = await getDb();
+  if (!db) return { totalClientes: 0, totalProfissionais: 0, totalServicos: 0, agendamentosHoje: 0 };
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const amanha = new Date(hoje);
+  amanha.setDate(amanha.getDate() + 1);
+
+  const [totalClientesResult, totalProfissionaisResult, totalServicosResult, agendamentosHojeResult] = await Promise.all([
+    db.select({ count: clientes.id }).from(clientes).where(eq(clientes.ativo, true)),
+    db.select({ count: profissionais.id }).from(profissionais).where(eq(profissionais.ativo, true)),
+    db.select({ count: servicos.id }).from(servicos).where(eq(servicos.ativo, true)),
+    db.select({ count: agendamentos.id }).from(agendamentos).where(
+      and(
+        eq(agendamentos.status, "confirmado"),
+        gte(agendamentos.dataHora, hoje),
+        lt(agendamentos.dataHora, amanha)
+      )
+    ),
+  ]);
+
+  return {
+    totalClientes: totalClientesResult.length,
+    totalProfissionais: totalProfissionaisResult.length,
+    totalServicos: totalServicosResult.length,
+    agendamentosHoje: agendamentosHojeResult.length,
+  };
 }

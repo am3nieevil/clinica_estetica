@@ -10,6 +10,7 @@ import Servicos from "./pages/Servicos";
 import Profissionais from "./pages/Profissionais";
 import ProfissionalServicos from "./pages/ProfissionalServicos";
 import Agendamento from "./pages/Agendamento";
+import Agendamentos from "./pages/Agendamentos";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -21,6 +22,7 @@ function Router() {
       <Route path={"/profissionais"} component={Profissionais} />
       <Route path={"/profissional-servicos"} component={ProfissionalServicos} />
       <Route path={"/agendamento"} component={Agendamento} />
+      <Route path={"/agendamentos"} component={Agendamentos} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

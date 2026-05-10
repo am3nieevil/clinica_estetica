@@ -2,185 +2,210 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Edit } from "lucide-react";
-import Sidebar from "@/components/Sidebar";
+import { Plus, Search, Trash2, Edit, Loader2, X, Check, Clock } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import DashboardLayout from "@/components/DashboardLayout";
 
-interface Servico {
-  id: string;
+interface FormData {
   nome: string;
-  valor: number;
-  duracao: number;
+  descricao: string;
+  valor: string;
+  duracao: string;
 }
 
+const emptyForm: FormData = { nome: "", descricao: "", valor: "", duracao: "" };
+
 export default function Servicos() {
-  const [servicos, setServicos] = useState<Servico[]>([
-    { id: "1", nome: "Limpeza de Pele", valor: 150, duracao: 60 },
-    { id: "2", nome: "Micropigmentação", valor: 500, duracao: 90 },
-    { id: "3", nome: "Botox", valor: 400, duracao: 30 },
-    { id: "4", nome: "Preenchimento Labial", valor: 350, duracao: 45 },
-  ]);
-
+  const [busca, setBusca] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ nome: "", valor: "", duracao: "" });
+  const [editId, setEditId] = useState<number | null>(null);
+  const [formData, setFormData] = useState<FormData>(emptyForm);
 
-  const handleAddServico = () => {
-    if (formData.nome && formData.valor && formData.duracao) {
-      setServicos([
-        ...servicos,
-        {
-          id: Date.now().toString(),
-          nome: formData.nome,
-          valor: parseFloat(formData.valor),
-          duracao: parseInt(formData.duracao),
-        },
-      ]);
-      setFormData({ nome: "", valor: "", duracao: "" });
+  const utils = trpc.useUtils();
+  const { data: servicos = [], isLoading } = trpc.servicos.list.useQuery();
+
+  const createMutation = trpc.servicos.create.useMutation({
+    onSuccess: () => {
+      utils.servicos.list.invalidate();
+      setFormData(emptyForm);
       setShowForm(false);
+      toast.success("Serviço cadastrado com sucesso!");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateMutation = trpc.servicos.update.useMutation({
+    onSuccess: () => {
+      utils.servicos.list.invalidate();
+      setEditId(null);
+      setFormData(emptyForm);
+      setShowForm(false);
+      toast.success("Serviço atualizado com sucesso!");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deleteMutation = trpc.servicos.delete.useMutation({
+    onSuccess: () => {
+      utils.servicos.list.invalidate();
+      toast.success("Serviço removido com sucesso!");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const servicosFiltrados = servicos.filter((s) =>
+    s.nome.toLowerCase().includes(busca.toLowerCase())
+  );
+
+  const handleSave = () => {
+    if (!formData.nome.trim() || !formData.valor.trim() || !formData.duracao.trim()) {
+      toast.error("Nome, valor e duração são obrigatórios.");
+      return;
+    }
+    const valorNum = parseFloat(formData.valor);
+    if (isNaN(valorNum) || valorNum <= 0) {
+      toast.error("Valor deve ser um número positivo.");
+      return;
+    }
+    const duracaoNum = parseInt(formData.duracao);
+    if (isNaN(duracaoNum) || duracaoNum < 5) {
+      toast.error("Duração mínima é de 5 minutos.");
+      return;
+    }
+    const payload = { nome: formData.nome, descricao: formData.descricao, valor: formData.valor, duracao: duracaoNum };
+    if (editId !== null) {
+      updateMutation.mutate({ id: editId, ...payload });
+    } else {
+      createMutation.mutate(payload);
     }
   };
 
-  const handleDelete = (id: string) => {
-    setServicos(servicos.filter((s) => s.id !== id));
+  const handleEdit = (serv: typeof servicos[0]) => {
+    setEditId(serv.id);
+    setFormData({ nome: serv.nome, descricao: serv.descricao ?? "", valor: serv.valor, duracao: serv.duracao.toString() });
+    setShowForm(true);
   };
 
+  const handleCancel = () => { setShowForm(false); setEditId(null); setFormData(emptyForm); };
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <div className="flex-1 overflow-auto">
-        <div className="p-8 max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="mb-8 flex justify-between items-start">
-            <div>
-              <h1 className="text-4xl font-bold text-foreground mb-2">Serviços</h1>
-              <p className="text-muted-foreground">
-                Gerencie seus procedimentos e preços
-              </p>
-            </div>
-            <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Novo Serviço
-            </Button>
+    <DashboardLayout>
+      <div className="p-6 max-w-5xl mx-auto">
+        <div className="mb-6 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-1">Serviços</h1>
+            <p className="text-muted-foreground">Gerencie o catálogo de serviços oferecidos</p>
           </div>
-
-          {/* Formulário de Novo Serviço */}
-          {showForm && (
-            <Card className="border-border bg-card mb-8">
-              <CardHeader>
-                <CardTitle>Adicionar Novo Serviço</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-foreground">
-                      Nome do Serviço *
-                    </label>
-                    <Input
-                      placeholder="Ex: Limpeza de Pele"
-                      value={formData.nome}
-                      onChange={(e) =>
-                        setFormData({ ...formData, nome: e.target.value })
-                      }
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-foreground">
-                        Valor (R$) *
-                      </label>
-                      <Input
-                        placeholder="150,00"
-                        type="number"
-                        step="0.01"
-                        value={formData.valor}
-                        onChange={(e) =>
-                          setFormData({ ...formData, valor: e.target.value })
-                        }
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-foreground">
-                        Duração (min) *
-                      </label>
-                      <Input
-                        placeholder="60"
-                        type="number"
-                        value={formData.duracao}
-                        onChange={(e) =>
-                          setFormData({ ...formData, duracao: e.target.value })
-                        }
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={handleAddServico}>Salvar Serviço</Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowForm(false);
-                        setFormData({ nome: "", valor: "", duracao: "" });
-                      }}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {!showForm && (
+            <Button onClick={() => setShowForm(true)} className="gap-2">
+              <Plus className="w-4 h-4" /> Novo Serviço
+            </Button>
           )}
+        </div>
 
-          {/* Lista de Serviços */}
-          <Card className="border-border bg-card">
+        {showForm && (
+          <Card className="mb-6 border-primary/30">
             <CardHeader>
-              <CardTitle>Lista de Serviços ({servicos.length})</CardTitle>
-              <CardDescription>
-                Seus procedimentos disponíveis para agendamento
-              </CardDescription>
+              <CardTitle>{editId ? "Editar Serviço" : "Novo Serviço"}</CardTitle>
             </CardHeader>
-            <CardContent>
-              {servicos.length > 0 ? (
-                <div className="space-y-2">
-                  {servicos.map((servico) => (
-                    <div
-                      key={servico.id}
-                      className="flex items-center justify-between p-4 bg-background rounded-lg border border-border hover:bg-muted transition-colors"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">{servico.nome}</p>
-                        <div className="text-sm text-muted-foreground space-x-4">
-                          <span>R$ {servico.valor.toFixed(2)}</span>
-                          <span>•</span>
-                          <span>{servico.duracao} minutos</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(servico.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium">Nome do Serviço *</label>
+                  <Input placeholder="Ex: Limpeza de Pele, Botox, Micropigmentação" value={formData.nome}
+                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })} className="mt-1" />
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    Nenhum serviço cadastrado
-                  </p>
+                <div>
+                  <label className="text-sm font-medium">Valor (R$) *</label>
+                  <Input placeholder="150.00" value={formData.valor} type="number" min="0" step="0.01"
+                    onChange={(e) => setFormData({ ...formData, valor: e.target.value })} className="mt-1" />
                 </div>
-              )}
+                <div>
+                  <label className="text-sm font-medium">Duração (minutos) *</label>
+                  <Input placeholder="60" value={formData.duracao} type="number" min="5"
+                    onChange={(e) => setFormData({ ...formData, duracao: e.target.value })} className="mt-1" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium">Descrição</label>
+                  <Input placeholder="Descrição opcional do serviço" value={formData.descricao}
+                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} className="mt-1" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  {editId ? "Salvar Alterações" : "Cadastrar Serviço"}
+                </Button>
+                <Button variant="outline" onClick={handleCancel} className="gap-2">
+                  <X className="w-4 h-4" /> Cancelar
+                </Button>
+              </div>
             </CardContent>
           </Card>
+        )}
+
+        <div className="mb-4 relative">
+          <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="Buscar serviço por nome..." value={busca}
+            onChange={(e) => setBusca(e.target.value)} className="pl-10" />
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Catálogo de Serviços ({servicosFiltrados.length})</CardTitle>
+            <CardDescription>Serviços disponíveis para agendamento</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : servicosFiltrados.length > 0 ? (
+              <div className="space-y-2">
+                {servicosFiltrados.map((serv) => (
+                  <div key={serv.id}
+                    className="flex items-center justify-between p-4 bg-background rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground">{serv.nome}</p>
+                      <div className="text-sm text-muted-foreground flex gap-3 flex-wrap mt-0.5">
+                        <span className="font-semibold text-primary">
+                          R$ {parseFloat(serv.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {serv.duracao} min
+                        </span>
+                        {serv.descricao && <span>• {serv.descricao}</span>}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 ml-2">
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(serv)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm"
+                        onClick={() => { if (confirm(`Remover o serviço "${serv.nome}"?`)) deleteMutation.mutate(serv.id); }}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-muted-foreground">
+                  {busca ? "Nenhum serviço encontrado." : "Nenhum serviço cadastrado ainda."}
+                </p>
+                {!busca && (
+                  <Button variant="outline" className="mt-4 gap-2" onClick={() => setShowForm(true)}>
+                    <Plus className="w-4 h-4" /> Cadastrar primeiro serviço
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
