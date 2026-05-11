@@ -14,7 +14,9 @@ export default function ProfissionalServicos() {
 
   const { data: profissionais = [], isLoading: loadingProf } = trpc.profissionais.list.useQuery();
   const { data: servicos = [], isLoading: loadingServ } = trpc.servicos.list.useQuery();
-  const { data: servicosAssociados = [], isLoading: loadingAssoc } =
+
+  // Retorna registros da tabela profissional_servicos: { profissionalId, servicoId }
+  const { data: associacoes = [], isLoading: loadingAssoc } =
     trpc.profissionalServicos.getByProfissional.useQuery(selectedProfissionalId!, {
       enabled: selectedProfissionalId !== null,
     });
@@ -36,20 +38,22 @@ export default function ProfissionalServicos() {
   });
 
   const isLoading = loadingProf || loadingServ;
+  const isMutating = associarMutation.isPending || removerMutation.isPending;
 
   const profissionalSelecionado = profissionais.find((p) => p.id === selectedProfissionalId);
-  const idsAssociados = new Set(servicosAssociados.map((s: { id: number }) => s.id));
 
-  const handleToggle = (servicoId: number, isAssociado: boolean) => {
-    if (!selectedProfissionalId) return;
+  // Os registros retornados têm { profissionalId, servicoId } — extraímos apenas os servicoIds
+  const idsAssociados = new Set(associacoes.map((a: { servicoId: number }) => a.servicoId));
+
+  const handleToggle = (servicoId: number) => {
+    if (!selectedProfissionalId || isMutating || loadingAssoc) return;
+    const isAssociado = idsAssociados.has(servicoId);
     if (isAssociado) {
       removerMutation.mutate({ profissionalId: selectedProfissionalId, servicoId });
     } else {
       associarMutation.mutate({ profissionalId: selectedProfissionalId, servicoId });
     }
   };
-
-  const isMutating = associarMutation.isPending || removerMutation.isPending;
 
   return (
     <DashboardLayout>
@@ -145,12 +149,16 @@ export default function ProfissionalServicos() {
                     </div>
                     <CardDescription>
                       {loadingAssoc
-                        ? "Carregando..."
+                        ? "Carregando associações..."
                         : `${idsAssociados.size} de ${servicos.length} serviço(s) associado(s)`}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {servicos.length === 0 ? (
+                    {loadingAssoc ? (
+                      <div className="flex items-center justify-center h-32">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      </div>
+                    ) : servicos.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <AlertCircle className="w-8 h-8 text-muted-foreground mb-2" />
                         <p className="text-sm text-muted-foreground">
@@ -164,8 +172,8 @@ export default function ProfissionalServicos() {
                           return (
                             <div
                               key={servico.id}
-                              onClick={() => !isMutating && handleToggle(servico.id, isAssociado)}
-                              className={`flex items-center gap-3 p-4 rounded-lg border transition-all cursor-pointer ${
+                              onClick={() => handleToggle(servico.id)}
+                              className={`flex items-center gap-3 p-4 rounded-lg border transition-all cursor-pointer select-none ${
                                 isAssociado
                                   ? "border-primary/40 bg-primary/5"
                                   : "border-border hover:border-primary/30 hover:bg-muted/40"
@@ -173,9 +181,6 @@ export default function ProfissionalServicos() {
                             >
                               <Checkbox
                                 checked={isAssociado}
-                                onCheckedChange={() =>
-                                  !isMutating && handleToggle(servico.id, isAssociado)
-                                }
                                 disabled={isMutating || loadingAssoc}
                                 className="pointer-events-none"
                               />
