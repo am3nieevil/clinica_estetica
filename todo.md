@@ -21,7 +21,11 @@
 - [x] Indicação visual de agendamentos passados pendentes de conclusão
 
 ## Qualidade
-- [x] Testes unitários dos routers tRPC (12 testes passando)
+- [x] Testes unitários dos routers tRPC (13 testes passando)
 - [x] Testes de validação de data passada, conflito de horário, dados inválidos
 - [x] Testes de validação de serviço (valor negativo, duração mínima)
 - [x] Testes de validação de cliente (nome curto, telefone inválido)
+- [x] Validação: profissional não pode realizar serviço ao qual não está associado (backend + frontend)
+- [x] Frontend: filtrar serviços pelo profissional selecionado no Step 3 do agendamento
+- [x] Frontend: resetar serviço selecionado ao trocar de profissional no formulário
+- [x] Teste unitário para validação de associação profissional-serviço

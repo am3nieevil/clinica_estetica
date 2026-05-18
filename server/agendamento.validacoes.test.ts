@@ -124,6 +124,8 @@ describe("Validações de Agendamento", () => {
       id: 1, nome: "Limpeza de Pele", descricao: null, valor: "150.00",
       duracao: 60, ativo: true, createdAt: new Date(), updatedAt: new Date(),
     });
+    // Profissional está associado ao serviço 1 (necessário para chegar na validação de conflito)
+    vi.mocked(db.getServicosByProfissional).mockResolvedValue([{ profissionalId: 1, servicoId: 1 }] as any);
     vi.mocked(db.verificarConflitoHorario).mockResolvedValue(true);
 
     const caller = appRouter.createCaller(createAuthContext());
@@ -141,6 +143,38 @@ describe("Validações de Agendamento", () => {
     ).rejects.toThrow("já possui um agendamento neste horário");
   });
 
+  it("deve rejeitar agendamento quando profissional não está associado ao serviço", async () => {
+    vi.mocked(db.getClienteById).mockResolvedValue({
+      id: 1, nome: "João", telefone: "11999999999", email: null,
+      dataNascimento: null, endereco: null, cidade: null,
+      ativo: true, createdAt: new Date(), updatedAt: new Date(),
+    });
+    vi.mocked(db.getProfissionalById).mockResolvedValue({
+      id: 1, nome: "Ana", especialidade: "Estética", telefone: "11888888888",
+      email: null, cidade: "São Paulo", ativo: true, createdAt: new Date(), updatedAt: new Date(),
+    });
+    vi.mocked(db.getServicoById).mockResolvedValue({
+      id: 2, nome: "Botox", descricao: null, valor: "500.00",
+      duracao: 30, ativo: true, createdAt: new Date(), updatedAt: new Date(),
+    });
+    // Profissional só tem o serviço 1 associado, não o 2
+    vi.mocked(db.getServicosByProfissional).mockResolvedValue([{ profissionalId: 1, servicoId: 1 }] as any);
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const dataFutura = new Date();
+    dataFutura.setDate(dataFutura.getDate() + 1);
+
+    await expect(
+      caller.agendamentos.create({
+        clienteId: 1,
+        profissionalId: 1,
+        servicoId: 2,
+        dataHora: dataFutura,
+        duracao: 30,
+      })
+    ).rejects.toThrow("não está habilitado para realizar o serviço");
+  });
+
   it("deve criar agendamento com sucesso quando todos os dados são válidos", async () => {
     vi.mocked(db.getClienteById).mockResolvedValue({
       id: 1, nome: "Maria", telefone: "11999999999", email: null,
@@ -155,6 +189,8 @@ describe("Validações de Agendamento", () => {
       id: 1, nome: "Massagem", descricao: null, valor: "200.00",
       duracao: 90, ativo: true, createdAt: new Date(), updatedAt: new Date(),
     });
+    // Profissional está associado ao serviço 1
+    vi.mocked(db.getServicosByProfissional).mockResolvedValue([{ profissionalId: 1, servicoId: 1 }] as any);
     vi.mocked(db.verificarConflitoHorario).mockResolvedValue(false);
 
     const caller = appRouter.createCaller(createAuthContext());

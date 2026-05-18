@@ -31,6 +31,17 @@ export default function Agendamento() {
   const { data: profissionais = [], isLoading: loadingProf } = trpc.profissionais.list.useQuery();
   const { data: servicos = [], isLoading: loadingServicos } = trpc.servicos.list.useQuery();
 
+  // Busca os IDs dos serviços associados ao profissional selecionado
+  const { data: associacoesProfissional = [], isLoading: loadingAssociacoes } = trpc.profissionalServicos.getByProfissional.useQuery(
+    formData.profissionalId,
+    { enabled: formData.profissionalId > 0 }
+  );
+  const servicosAssociadosIds = new Set(associacoesProfissional.map((a) => a.servicoId));
+  // Filtra apenas serviços associados ao profissional selecionado
+  const servicosDoProf = formData.profissionalId > 0
+    ? servicos.filter((s) => servicosAssociadosIds.has(s.id))
+    : servicos;
+
   const createMutation = trpc.agendamentos.create.useMutation({
     onSuccess: () => {
       setAgendamentoConfirmado(true);
@@ -70,13 +81,13 @@ export default function Agendamento() {
 
   const servicosFiltrados = useMemo(() => {
     const q = buscaServico.toLowerCase().trim();
-    if (!q) return servicos;
-    return servicos.filter(
+    if (!q) return servicosDoProf;
+    return servicosDoProf.filter(
       (s) =>
         s.nome.toLowerCase().includes(q) ||
         (s.descricao ?? "").toLowerCase().includes(q)
     );
-  }, [servicos, buscaServico]);
+  }, [servicosDoProf, buscaServico]);
 
   // Validação de data mínima: hoje
   const hoje = new Date().toISOString().split("T")[0];
@@ -268,7 +279,7 @@ export default function Agendamento() {
                       profissionaisFiltrados.map((p) => (
                         <button
                           key={p.id}
-                          onClick={() => setFormData({ ...formData, profissionalId: p.id })}
+                          onClick={() => setFormData({ ...formData, profissionalId: p.id, servicoId: 0 })}
                           className={`w-full p-4 text-left rounded-lg border-2 transition-colors ${
                             formData.profissionalId === p.id
                               ? "border-primary bg-primary/10"
@@ -298,16 +309,19 @@ export default function Agendamento() {
           <Card>
             <CardHeader>
               <CardTitle>Selecione o Serviço</CardTitle>
-              <CardDescription>Busque pelo nome ou descrição do procedimento</CardDescription>
+              <CardDescription>
+                Serviços disponíveis para {profissionalSelecionado?.nome ?? "o profissional selecionado"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {loadingServicos ? (
+              {loadingServicos || loadingAssociacoes ? (
                 <div className="flex justify-center py-6"><Loader2 className="w-6 h-6 animate-spin" /></div>
-              ) : servicos.length === 0 ? (
+              ) : servicosDoProf.length === 0 ? (
                 <div className="text-center py-6">
                   <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground">Nenhum serviço cadastrado.</p>
-                  <Button variant="link" onClick={() => navigate("/servicos")}>Cadastrar serviço</Button>
+                  <p className="text-muted-foreground font-medium">Nenhum serviço associado a este profissional.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Configure as associações na página de Associações.</p>
+                  <Button variant="link" onClick={() => navigate("/profissional-servicos")}>Ir para Associações</Button>
                 </div>
               ) : (
                 <>
