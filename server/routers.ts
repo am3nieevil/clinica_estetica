@@ -196,7 +196,17 @@ export const appRouter = router({
         if (!profissional) throw new TRPCError({ code: "NOT_FOUND", message: "Profissional não encontrado." });
         if (!servico) throw new TRPCError({ code: "NOT_FOUND", message: "Serviço não encontrado." });
 
-        // ✅ Validação 3: Verificar conflito de horário para o profissional
+        // ✅ Validação 3: Verificar se o profissional está associado ao serviço
+        const associacoes = await db.getServicosByProfissional(input.profissionalId);
+        const associado = associacoes.some((a) => a.servicoId === input.servicoId);
+        if (!associado) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `O profissional ${profissional.nome} não está habilitado para realizar o serviço "${servico.nome}". Configure as associações na página de Associações.`,
+          });
+        }
+
+        // ✅ Validação 4: Verificar conflito de horário para o profissional
         const temConflito = await db.verificarConflitoHorario(
           input.profissionalId,
           input.dataHora,
