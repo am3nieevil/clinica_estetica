@@ -15,6 +15,13 @@
       "when": 1777827284025,
       "tag": "0001_slim_junta",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1779073331743,
+      "tag": "0002_special_dreaming_celestial",
+      "breakpoints": true
     }
   ]
 }

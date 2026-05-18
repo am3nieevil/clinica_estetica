@@ -1,89 +1,36 @@
-# Estética Pro — Sistema de Agendamento Estético
+# Clínica Estética — Sistema de Agendamento
 
-Aplicação web completa para gerenciamento de uma clínica ou profissional autônomo de estética. Permite cadastrar clientes, profissionais, serviços e agendamentos com validações de negócio, busca em tempo real e controle de associações entre profissionais e serviços.
-
----
-
-## Funcionalidades
-
-- **Dashboard** com estatísticas do dia (agendamentos, clientes, serviços, profissionais)
-- **CRUD de Clientes** — cadastro, edição, busca e exclusão
-- **CRUD de Profissionais** — com campo de cidade, especialidade e status ativo/inativo
-- **CRUD de Serviços** — com valor, duração e descrição
-- **Agendamentos** — criação com busca em tempo real por cliente, profissional e serviço; validação de data/hora passada e conflito de horário
-- **Listagem de Agendamentos** — com filtros por status e busca
-- **Associações Profissional ↔ Serviço** — define quais serviços cada profissional pode realizar
+Sistema web completo para gerenciamento de agendamentos de clínica estética. Inclui CRUD de clientes, profissionais, serviços e agendamentos, com autenticação local por e-mail e senha — **sem dependência do Manus OAuth**.
 
 ---
 
 ## Tecnologias
 
 | Camada | Tecnologia |
-| :--- | :--- |
-| Frontend | React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui |
+|---|---|
+| Frontend | React 19 + Vite + Tailwind CSS 4 + shadcn/ui |
 | Backend | Node.js + Express + tRPC 11 |
-| Banco de Dados | MySQL (via Drizzle ORM) |
-| Autenticação | Manus OAuth (JWT em cookie) |
+| Banco de dados | MySQL / TiDB (via Drizzle ORM) |
+| Autenticação | JWT local (bcryptjs + jose) |
 | Testes | Vitest |
-| Build | Vite 7 |
-| Gerenciador de pacotes | pnpm |
-
----
-
-## Estrutura do Projeto
-
-```
-agendamento-estetico-telas/
-├── client/
-│   └── src/
-│       ├── pages/           ← Telas da aplicação
-│       │   ├── Dashboard.tsx
-│       │   ├── Clientes.tsx
-│       │   ├── Profissionais.tsx
-│       │   ├── Servicos.tsx
-│       │   ├── Agendamento.tsx      ← Formulário de novo agendamento
-│       │   ├── Agendamentos.tsx     ← Listagem de agendamentos
-│       │   └── ProfissionalServicos.tsx ← Associações
-│       ├── components/
-│       │   ├── DashboardLayout.tsx  ← Layout com sidebar
-│       │   └── ui/                  ← Componentes shadcn/ui
-│       └── App.tsx                  ← Rotas
-├── drizzle/
-│   └── schema.ts            ← Tabelas do banco de dados
-├── server/
-│   ├── routers.ts           ← Procedures tRPC (API)
-│   ├── db.ts                ← Funções de consulta ao banco
-│   ├── storage.ts           ← Helpers de armazenamento S3
-│   └── agendamento.validacoes.test.ts ← Testes unitários
-└── shared/                  ← Tipos e constantes compartilhados
-```
-
----
-
-## Banco de Dados — Tabelas
-
-| Tabela | Descrição |
-| :--- | :--- |
-| `users` | Usuários autenticados via OAuth |
-| `clientes` | Clientes da clínica |
-| `profissionais` | Profissionais/esteticistas |
-| `servicos` | Serviços/procedimentos oferecidos |
-| `profissional_servicos` | Associação N:N entre profissionais e serviços |
-| `agendamentos` | Agendamentos com status (pendente/confirmado/cancelado/concluído) |
 
 ---
 
 ## Pré-requisitos
 
-Antes de começar, certifique-se de ter instalado na sua máquina:
+Instale as ferramentas abaixo antes de começar:
 
-- [Node.js](https://nodejs.org/) versão **22 ou superior**
-- [pnpm](https://pnpm.io/installation) versão **10 ou superior**
-- Acesso a um banco de dados **MySQL** (local ou em nuvem, ex: PlanetScale, Railway, TiDB)
+- [Node.js 20+](https://nodejs.org/) — runtime JavaScript
+- [pnpm](https://pnpm.io/installation) — gerenciador de pacotes (`npm install -g pnpm`)
+- [MySQL 8+](https://dev.mysql.com/downloads/) ou [TiDB](https://tidbcloud.com/) — banco de dados relacional
+- [Git](https://git-scm.com/) — controle de versão
+
+> **Windows:** todos os comandos abaixo funcionam no PowerShell, Git Bash ou Terminal do VS Code.
+> **macOS/Linux:** use o terminal padrão.
 
 ---
 
-## Passo a Passo para Rodar Localmente
+## Instalação e configuração local
 
 ### 1. Clonar o repositório
 
@@ -98,101 +45,165 @@ cd clinica_estetica
 pnpm install
 ```
 
-### 3. Configurar as variáveis de ambiente
+### 3. Criar o arquivo `.env`
 
-Crie um arquivo `.env` na raiz do projeto com o seguinte conteúdo:
+Crie um arquivo chamado `.env` na **raiz do projeto** com o seguinte conteúdo:
 
 ```env
-# Banco de dados MySQL (obrigatório)
-DATABASE_URL="mysql://usuario:senha@host:3306/nome_do_banco"
+# ─── Banco de dados ───────────────────────────────────────────────────────────
+# Formato: mysql://usuario:senha@host:porta/nome_do_banco
+DATABASE_URL="mysql://root:suasenha@localhost:3306/clinica_estetica"
 
-# Segredo para assinar os cookies de sessão (qualquer string longa e aleatória)
-JWT_SECRET="sua-chave-secreta-aqui-minimo-32-caracteres"
+# ─── Autenticação JWT ─────────────────────────────────────────────────────────
+# Chave secreta para assinar os tokens de sessão.
+# Use qualquer string longa e aleatória. Nunca compartilhe este valor.
+JWT_SECRET="troque-por-uma-chave-secreta-longa-e-aleatoria"
 
-# Autenticação OAuth (necessário para login — veja nota abaixo)
-VITE_APP_ID="seu-app-id-manus"
-OAUTH_SERVER_URL="https://oauth.manus.space"
-VITE_OAUTH_PORTAL_URL="https://portal.manus.space"
-OWNER_OPEN_ID="seu-open-id"
-OWNER_NAME="Seu Nome"
+# ─── Variáveis do Vite (frontend) ─────────────────────────────────────────────
+# Estas variáveis são necessárias para o build do frontend.
+# Para uso local, os valores abaixo são suficientes.
+VITE_APP_ID="local"
+VITE_APP_TITLE="Clínica Estética"
+VITE_OAUTH_PORTAL_URL="http://localhost:3000"
+VITE_FRONTEND_FORGE_API_KEY="local"
+VITE_FRONTEND_FORGE_API_URL="http://localhost:3000"
 
-# APIs internas (deixe em branco se não usar IA/storage)
-BUILT_IN_FORGE_API_URL=""
-BUILT_IN_FORGE_API_KEY=""
-VITE_FRONTEND_FORGE_API_KEY=""
-VITE_FRONTEND_FORGE_API_URL=""
+# ─── Informações do proprietário (opcional) ───────────────────────────────────
+OWNER_OPEN_ID="admin@clinica.com"
+OWNER_NAME="Administrador"
 ```
 
-> **Nota sobre autenticação:** Este projeto usa Manus OAuth. Se você quiser rodar sem autenticação para desenvolvimento local, pode comentar as rotas protegidas em `server/routers.ts` e usar `publicProcedure` em vez de `protectedProcedure`.
+> **Dica:** Para gerar um `JWT_SECRET` seguro, execute no terminal:
+> ```bash
+> node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+> ```
 
-### 4. Criar as tabelas no banco de dados
+### 4. Criar o banco de dados
+
+Acesse o MySQL e crie o banco:
+
+```sql
+CREATE DATABASE clinica_estetica CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### 5. Criar as tabelas
 
 ```bash
 pnpm db:push
 ```
 
-Este comando gera as migrações e aplica o schema no banco de dados configurado em `DATABASE_URL`.
+Este comando gera e aplica as migrações automaticamente. As seguintes tabelas serão criadas:
 
-### 5. Rodar o servidor de desenvolvimento
+| Tabela | Descrição |
+|---|---|
+| `users` | Usuários do sistema (login local) |
+| `clientes` | Clientes/pacientes da clínica |
+| `profissionais` | Profissionais (esteticistas) |
+| `servicos` | Serviços oferecidos |
+| `profissional_servicos` | Associação entre profissionais e serviços |
+| `agendamentos` | Agendamentos de atendimentos |
+
+### 6. Iniciar o servidor de desenvolvimento
 
 ```bash
 pnpm dev
 ```
 
-O servidor iniciará em `http://localhost:3000`. O frontend e o backend rodam juntos na mesma porta.
+Acesse o sistema em: **http://localhost:3000**
 
 ---
 
-## Scripts Disponíveis
+## Primeiro acesso
+
+1. Acesse **http://localhost:3000**
+2. Clique em **"Entrar no sistema"** ou navegue para **http://localhost:3000/login**
+3. Vá na aba **"Criar conta"**
+4. Preencha nome, e-mail e senha (mínimo 6 caracteres)
+5. Clique em **"Criar conta"** — você será redirecionado automaticamente para o dashboard
+
+---
+
+## Scripts disponíveis
 
 | Comando | Descrição |
-| :--- | :--- |
-| `pnpm dev` | Inicia o servidor de desenvolvimento (frontend + backend) |
+|---|---|
+| `pnpm dev` | Inicia o servidor de desenvolvimento (hot reload) |
 | `pnpm build` | Gera o build de produção |
 | `pnpm start` | Inicia o servidor em modo produção (requer build) |
-| `pnpm test` | Executa os testes unitários com Vitest |
+| `pnpm test` | Executa os testes unitários |
 | `pnpm db:push` | Gera e aplica as migrações do banco de dados |
-| `pnpm check` | Verifica erros de TypeScript |
-| `pnpm format` | Formata o código com Prettier |
 
 ---
 
-## Como Adicionar Novas Funcionalidades
+## Estrutura do projeto
 
-O projeto segue um fluxo de 4 passos para cada nova feature:
-
-1. **Schema** — Adicione ou altere tabelas em `drizzle/schema.ts` e execute `pnpm db:push`
-2. **Banco** — Adicione funções de consulta em `server/db.ts`
-3. **API** — Crie procedures tRPC em `server/routers.ts` (use `publicProcedure` ou `protectedProcedure`)
-4. **Frontend** — Crie a página em `client/src/pages/`, registre a rota em `client/src/App.tsx` e adicione ao menu em `client/src/components/DashboardLayout.tsx`
-
----
-
-## Testes
-
-```bash
-pnpm test
+```
+clinica_estetica/
+├── client/
+│   └── src/
+│       ├── pages/          ← Telas do sistema (Dashboard, Clientes, etc.)
+│       ├── components/     ← Componentes reutilizáveis (DashboardLayout, etc.)
+│       ├── _core/hooks/    ← Hook useAuth para estado de autenticação
+│       └── const.ts        ← Configurações do frontend (URL de login)
+├── server/
+│   ├── _core/
+│   │   ├── localAuth.ts        ← Autenticação local (JWT + bcrypt)
+│   │   ├── localAuthRoutes.ts  ← Rotas POST /api/auth/login e /register
+│   │   ├── context.ts          ← Contexto tRPC (lê sessão do cookie)
+│   │   └── index.ts            ← Entry point do servidor Express
+│   ├── routers.ts          ← Todas as procedures tRPC (CRUD completo)
+│   └── db.ts               ← Funções de acesso ao banco de dados
+├── drizzle/
+│   └── schema.ts           ← Definição das tabelas do banco de dados
+└── .env                    ← Variáveis de ambiente (NÃO commitar)
 ```
 
-Os testes estão em `server/agendamento.validacoes.test.ts` e cobrem as validações críticas de negócio:
+---
 
-- Rejeição de agendamentos em datas/horários passados
-- Detecção de conflito de horário entre profissionais
-- Validação de campos obrigatórios (cliente, profissional, serviço)
-- Regras de duração e sobreposição de atendimentos
+## Como a autenticação funciona
+
+O sistema usa **autenticação local** com e-mail e senha, sem dependência de serviços externos:
+
+1. **Registro:** `POST /api/auth/login` — a senha é hasheada com `bcryptjs` (10 rounds) antes de salvar no banco.
+2. **Login:** `POST /api/auth/register` — compara a senha informada com o hash armazenado. Em caso de sucesso, gera um token JWT assinado com `JWT_SECRET` e salva em um cookie HTTP-only.
+3. **Sessão:** A cada requisição ao `/api/trpc`, o servidor lê o cookie, verifica o JWT e injeta o usuário no contexto tRPC.
+4. **Logout:** Limpa o cookie de sessão.
 
 ---
 
-## Próximas Funcionalidades Planejadas (Backlog)
+## Funcionalidades do sistema
 
-- [ ] Grade de disponibilidade por profissional (dias e horários de trabalho)
-- [ ] Filtro de serviços por profissional no formulário de agendamento
-- [ ] Edição de agendamentos existentes
-- [ ] Histórico de atendimentos por cliente
-- [ ] Notificações de lembrete (e-mail/WhatsApp) antes do agendamento
+- **Dashboard** — Visão geral com estatísticas e agenda do dia
+- **Clientes** — CRUD completo com busca por nome, telefone e e-mail
+- **Profissionais** — CRUD com campo de cidade e status ativo/inativo
+- **Serviços** — Catálogo com nome, descrição, valor e duração
+- **Associações** — Vincula profissionais aos serviços que realizam
+- **Agendamentos** — Marcação com busca por cliente/profissional/serviço, validação de data passada e conflito de horário
 
 ---
 
-## Licença
+## Validações de negócio
 
-MIT
+| Regra | Descrição |
+|---|---|
+| Data no passado | Não permite agendar em data/hora anterior ao momento atual |
+| Conflito de horário | Não permite dois agendamentos para o mesmo profissional no mesmo horário |
+| Campos obrigatórios | Nome do cliente, profissional e serviço são obrigatórios |
+| Senha mínima | A senha deve ter ao menos 6 caracteres |
+| E-mail único | Não permite dois usuários com o mesmo e-mail |
+
+---
+
+## Solução de problemas
+
+**Erro: `Cannot connect to database`**
+Verifique se o MySQL está rodando e se a `DATABASE_URL` no `.env` está correta.
+
+**Erro: `Port 3000 is busy`**
+O servidor tentará automaticamente a porta 3001, 3002, etc. Verifique o terminal para ver qual porta foi usada.
+
+**Erro ao executar `pnpm db:push`**
+Certifique-se de que o banco de dados `clinica_estetica` foi criado antes de executar o comando.
+
+**Tela de login não redireciona após login**
+Limpe os cookies do navegador e tente novamente.
