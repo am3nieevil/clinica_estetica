@@ -85,14 +85,14 @@ export const profissionalServicos = mysqlTable("profissional_servicos", {
 export type ProfissionalServico = typeof profissionalServicos.$inferSelect;
 export type InsertProfissionalServico = typeof profissionalServicos.$inferInsert;
 
-// Tabela de Agendamentos
+// Tabela de Agendamentos (sem servicoId — usa tabela agendamento_servicos para múltiplos)
 export const agendamentos = mysqlTable("agendamentos", {
   id: int("id").autoincrement().primaryKey(),
   clienteId: int("clienteId").notNull(),
   profissionalId: int("profissionalId").notNull(),
-  servicoId: int("servicoId").notNull(),
   dataHora: timestamp("dataHora").notNull(),
-  duracao: int("duracao").notNull(), // em minutos
+  duracao: int("duracao").notNull(), // soma das durações dos serviços, em minutos
+  valorTotal: decimal("valorTotal", { precision: 10, scale: 2 }), // soma dos valores dos serviços
   status: mysqlEnum("status", ["confirmado", "cancelado", "concluido"]).default("confirmado").notNull(),
   notas: text("notas"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -101,3 +101,14 @@ export const agendamentos = mysqlTable("agendamentos", {
 
 export type Agendamento = typeof agendamentos.$inferSelect;
 export type InsertAgendamento = typeof agendamentos.$inferInsert;
+
+// Tabela de Serviços por Agendamento (relação N:N entre agendamentos e serviços)
+export const agendamentoServicos = mysqlTable("agendamento_servicos", {
+  id: int("id").autoincrement().primaryKey(),
+  agendamentoId: int("agendamentoId").notNull(),
+  servicoId: int("servicoId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AgendamentoServico = typeof agendamentoServicos.$inferSelect;
+export type InsertAgendamentoServico = typeof agendamentoServicos.$inferInsert;

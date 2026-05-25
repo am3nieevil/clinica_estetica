@@ -22,6 +22,7 @@ vi.mock("./db", () => ({
   createProfissional: vi.fn().mockResolvedValue({ insertId: 1 }),
   updateProfissional: vi.fn().mockResolvedValue({}),
   deleteProfissional: vi.fn().mockResolvedValue({}),
+  setServicosForProfissional: vi.fn().mockResolvedValue({}),
   createServico: vi.fn().mockResolvedValue({ insertId: 1 }),
   updateServico: vi.fn().mockResolvedValue({}),
   deleteServico: vi.fn().mockResolvedValue({}),
@@ -29,6 +30,8 @@ vi.mock("./db", () => ({
   getServicosByProfissional: vi.fn().mockResolvedValue([]),
   associarServicoToProfissional: vi.fn().mockResolvedValue({}),
   removerServicoFromProfissional: vi.fn().mockResolvedValue({}),
+  addServicosToAgendamento: vi.fn().mockResolvedValue({}),
+  removeServicosFromAgendamento: vi.fn().mockResolvedValue({}),
   getDashboardStats: vi.fn().mockResolvedValue({ totalClientes: 0, totalProfissionais: 0, totalServicos: 0, agendamentosHoje: 0 }),
   upsertUser: vi.fn(),
   getUserByOpenId: vi.fn(),
@@ -54,6 +57,28 @@ function createAuthContext(): TrpcContext {
   };
 }
 
+// Helpers para mocks reutilizáveis
+const mockCliente = {
+  id: 1, nome: "João Silva", telefone: "11999999999", email: null,
+  dataNascimento: null, endereco: null, cidade: null,
+  ativo: true, createdAt: new Date(), updatedAt: new Date(),
+};
+
+const mockProfissional = {
+  id: 1, nome: "Ana Souza", especialidade: "Estética", telefone: "11888888888",
+  email: null, cidade: "São Paulo", ativo: true, createdAt: new Date(), updatedAt: new Date(),
+};
+
+const mockServico1 = {
+  id: 1, nome: "Limpeza de Pele", descricao: null, valor: "150.00",
+  duracao: 60, ativo: true, createdAt: new Date(), updatedAt: new Date(),
+};
+
+const mockServico2 = {
+  id: 2, nome: "Cílios", descricao: null, valor: "120.00",
+  duracao: 45, ativo: true, createdAt: new Date(), updatedAt: new Date(),
+};
+
 describe("Validações de Agendamento", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,9 +93,8 @@ describe("Validações de Agendamento", () => {
       caller.agendamentos.create({
         clienteId: 1,
         profissionalId: 1,
-        servicoId: 1,
+        servicoIds: [1],
         dataHora: dataPassada,
-        duracao: 60,
       })
     ).rejects.toThrow("Não é possível agendar em uma data e horário passados");
   });
@@ -83,9 +107,8 @@ describe("Validações de Agendamento", () => {
       caller.agendamentos.create({
         clienteId: 1,
         profissionalId: 1,
-        servicoId: 1,
+        servicoIds: [1],
         dataHora: agora,
-        duracao: 60,
       })
     ).rejects.toThrow("Não é possível agendar em uma data e horário passados");
   });
@@ -93,7 +116,6 @@ describe("Validações de Agendamento", () => {
   it("deve rejeitar agendamento quando cliente não existe", async () => {
     vi.mocked(db.getClienteById).mockResolvedValue(undefined);
     vi.mocked(db.getProfissionalById).mockResolvedValue(undefined);
-    vi.mocked(db.getServicoById).mockResolvedValue(undefined);
 
     const caller = appRouter.createCaller(createAuthContext());
     const dataFutura = new Date();
@@ -103,29 +125,18 @@ describe("Validações de Agendamento", () => {
       caller.agendamentos.create({
         clienteId: 999,
         profissionalId: 1,
-        servicoId: 1,
+        servicoIds: [1],
         dataHora: dataFutura,
-        duracao: 60,
       })
     ).rejects.toThrow("Cliente não encontrado");
   });
 
   it("deve rejeitar agendamento quando há conflito de horário", async () => {
-    vi.mocked(db.getClienteById).mockResolvedValue({
-      id: 1, nome: "João", telefone: "11999999999", email: null,
-      dataNascimento: null, endereco: null, cidade: null,
-      ativo: true, createdAt: new Date(), updatedAt: new Date(),
-    });
-    vi.mocked(db.getProfissionalById).mockResolvedValue({
-      id: 1, nome: "Ana", especialidade: "Estética", telefone: "11888888888",
-      email: null, cidade: "São Paulo", ativo: true, createdAt: new Date(), updatedAt: new Date(),
-    });
-    vi.mocked(db.getServicoById).mockResolvedValue({
-      id: 1, nome: "Limpeza de Pele", descricao: null, valor: "150.00",
-      duracao: 60, ativo: true, createdAt: new Date(), updatedAt: new Date(),
-    });
-    // Profissional está associado ao serviço 1 (necessário para chegar na validação de conflito)
-    vi.mocked(db.getServicosByProfissional).mockResolvedValue([{ profissionalId: 1, servicoId: 1 }] as any);
+    vi.mocked(db.getClienteById).mockResolvedValue(mockCliente);
+    vi.mocked(db.getProfissionalById).mockResolvedValue(mockProfissional);
+    vi.mocked(db.getServicoById).mockResolvedValue(mockServico1);
+    // Profissional está associado ao serviço 1
+    vi.mocked(db.getServicosByProfissional).mockResolvedValue([{ id: 1, profissionalId: 1, servicoId: 1, createdAt: new Date() }]);
     vi.mocked(db.verificarConflitoHorario).mockResolvedValue(true);
 
     const caller = appRouter.createCaller(createAuthContext());
@@ -136,29 +147,21 @@ describe("Validações de Agendamento", () => {
       caller.agendamentos.create({
         clienteId: 1,
         profissionalId: 1,
-        servicoId: 1,
+        servicoIds: [1],
         dataHora: dataFutura,
-        duracao: 60,
       })
     ).rejects.toThrow("já possui um agendamento neste horário");
   });
 
   it("deve rejeitar agendamento quando profissional não está associado ao serviço", async () => {
-    vi.mocked(db.getClienteById).mockResolvedValue({
-      id: 1, nome: "João", telefone: "11999999999", email: null,
-      dataNascimento: null, endereco: null, cidade: null,
-      ativo: true, createdAt: new Date(), updatedAt: new Date(),
-    });
-    vi.mocked(db.getProfissionalById).mockResolvedValue({
-      id: 1, nome: "Ana", especialidade: "Estética", telefone: "11888888888",
-      email: null, cidade: "São Paulo", ativo: true, createdAt: new Date(), updatedAt: new Date(),
-    });
+    vi.mocked(db.getClienteById).mockResolvedValue(mockCliente);
+    vi.mocked(db.getProfissionalById).mockResolvedValue(mockProfissional);
+    // Serviço 2 (Botox) existe mas profissional só tem serviço 1 associado
     vi.mocked(db.getServicoById).mockResolvedValue({
       id: 2, nome: "Botox", descricao: null, valor: "500.00",
       duracao: 30, ativo: true, createdAt: new Date(), updatedAt: new Date(),
     });
-    // Profissional só tem o serviço 1 associado, não o 2
-    vi.mocked(db.getServicosByProfissional).mockResolvedValue([{ profissionalId: 1, servicoId: 1 }] as any);
+    vi.mocked(db.getServicosByProfissional).mockResolvedValue([{ id: 1, profissionalId: 1, servicoId: 1, createdAt: new Date() }]);
 
     const caller = appRouter.createCaller(createAuthContext());
     const dataFutura = new Date();
@@ -168,29 +171,17 @@ describe("Validações de Agendamento", () => {
       caller.agendamentos.create({
         clienteId: 1,
         profissionalId: 1,
-        servicoId: 2,
+        servicoIds: [2],
         dataHora: dataFutura,
-        duracao: 30,
       })
     ).rejects.toThrow("não está habilitado para realizar o serviço");
   });
 
-  it("deve criar agendamento com sucesso quando todos os dados são válidos", async () => {
-    vi.mocked(db.getClienteById).mockResolvedValue({
-      id: 1, nome: "Maria", telefone: "11999999999", email: null,
-      dataNascimento: null, endereco: null, cidade: null,
-      ativo: true, createdAt: new Date(), updatedAt: new Date(),
-    });
-    vi.mocked(db.getProfissionalById).mockResolvedValue({
-      id: 1, nome: "Carla", especialidade: "Estética", telefone: "11888888888",
-      email: null, cidade: "Rio de Janeiro", ativo: true, createdAt: new Date(), updatedAt: new Date(),
-    });
-    vi.mocked(db.getServicoById).mockResolvedValue({
-      id: 1, nome: "Massagem", descricao: null, valor: "200.00",
-      duracao: 90, ativo: true, createdAt: new Date(), updatedAt: new Date(),
-    });
-    // Profissional está associado ao serviço 1
-    vi.mocked(db.getServicosByProfissional).mockResolvedValue([{ profissionalId: 1, servicoId: 1 }] as any);
+  it("deve criar agendamento com um único serviço com sucesso", async () => {
+    vi.mocked(db.getClienteById).mockResolvedValue(mockCliente);
+    vi.mocked(db.getProfissionalById).mockResolvedValue(mockProfissional);
+    vi.mocked(db.getServicoById).mockResolvedValue(mockServico1);
+    vi.mocked(db.getServicosByProfissional).mockResolvedValue([{ id: 1, profissionalId: 1, servicoId: 1, createdAt: new Date() }]);
     vi.mocked(db.verificarConflitoHorario).mockResolvedValue(false);
 
     const caller = appRouter.createCaller(createAuthContext());
@@ -200,13 +191,50 @@ describe("Validações de Agendamento", () => {
     const resultado = await caller.agendamentos.create({
       clienteId: 1,
       profissionalId: 1,
-      servicoId: 1,
+      servicoIds: [1],
       dataHora: dataFutura,
-      duracao: 90,
     });
 
     expect(resultado).toBeDefined();
     expect(db.createAgendamento).toHaveBeenCalledOnce();
+    // Verifica que foi chamado com duração e valor corretos (1 serviço: 60min, R$150)
+    expect(db.createAgendamento).toHaveBeenCalledWith(
+      expect.objectContaining({ duracao: 60, valorTotal: "150.00" })
+    );
+  });
+
+  it("deve criar agendamento com múltiplos serviços somando duração e valor", async () => {
+    vi.mocked(db.getClienteById).mockResolvedValue(mockCliente);
+    vi.mocked(db.getProfissionalById).mockResolvedValue(mockProfissional);
+    // getServicoById chamado para cada serviço
+    vi.mocked(db.getServicoById)
+      .mockResolvedValueOnce(mockServico1)  // id=1: 60min, R$150
+      .mockResolvedValueOnce(mockServico2); // id=2: 45min, R$120
+    vi.mocked(db.getServicosByProfissional).mockResolvedValue([
+      { id: 1, profissionalId: 1, servicoId: 1, createdAt: new Date() },
+      { id: 2, profissionalId: 1, servicoId: 2, createdAt: new Date() },
+    ]);
+    vi.mocked(db.verificarConflitoHorario).mockResolvedValue(false);
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const dataFutura = new Date();
+    dataFutura.setDate(dataFutura.getDate() + 2);
+
+    const resultado = await caller.agendamentos.create({
+      clienteId: 1,
+      profissionalId: 1,
+      servicoIds: [1, 2],
+      dataHora: dataFutura,
+    });
+
+    expect(resultado).toBeDefined();
+    expect(db.createAgendamento).toHaveBeenCalledOnce();
+    // Verifica que foi chamado com duração total (60+45=105min) e valor total (150+120=270)
+    expect(db.createAgendamento).toHaveBeenCalledWith(
+      expect.objectContaining({ duracao: 105, valorTotal: "270.00" })
+    );
+    // Verifica que os serviços foram associados ao agendamento
+    expect(db.addServicosToAgendamento).toHaveBeenCalledWith(1, [1, 2]);
   });
 });
 

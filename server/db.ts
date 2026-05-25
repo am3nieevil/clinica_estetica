@@ -1,6 +1,14 @@
-import { eq, and, gte, lt } from "drizzle-orm";
+import { eq, and, gte, lt, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, clientes, InsertCliente, profissionais, InsertProfissional, servicos, InsertServico, agendamentos, InsertAgendamento, profissionalServicos } from "../drizzle/schema";
+import {
+  InsertUser, users,
+  clientes, InsertCliente,
+  profissionais, InsertProfissional,
+  servicos, InsertServico,
+  agendamentos, InsertAgendamento,
+  profissionalServicos,
+  agendamentoServicos,
+} from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -214,7 +222,41 @@ export async function updateAgendamento(id: number, data: Partial<InsertAgendame
 export async function deleteAgendamento(id: number) {
   const db = await getDb();
   if (!db) return undefined;
+  // Deleta os serviços vinculados primeiro
+  await db.delete(agendamentoServicos).where(eq(agendamentoServicos.agendamentoId, id));
   return await db.delete(agendamentos).where(eq(agendamentos.id, id));
+}
+
+// Queries para Serviços de um Agendamento
+export async function getServicosByAgendamento(agendamentoId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db
+    .select({
+      id: agendamentoServicos.id,
+      agendamentoId: agendamentoServicos.agendamentoId,
+      servicoId: agendamentoServicos.servicoId,
+      servicoNome: servicos.nome,
+      servicoValor: servicos.valor,
+      servicoDuracao: servicos.duracao,
+    })
+    .from(agendamentoServicos)
+    .leftJoin(servicos, eq(agendamentoServicos.servicoId, servicos.id))
+    .where(eq(agendamentoServicos.agendamentoId, agendamentoId));
+}
+
+export async function addServicosToAgendamento(agendamentoId: number, servicoIds: number[]) {
+  const db = await getDb();
+  if (!db) return undefined;
+  if (servicoIds.length === 0) return;
+  const rows = servicoIds.map((servicoId) => ({ agendamentoId, servicoId }));
+  return await db.insert(agendamentoServicos).values(rows);
+}
+
+export async function removeServicosFromAgendamento(agendamentoId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  return await db.delete(agendamentoServicos).where(eq(agendamentoServicos.agendamentoId, agendamentoId));
 }
 
 // Queries para Associações Profissional-Serviço
@@ -236,6 +278,16 @@ export async function removerServicoFromProfissional(profissionalId: number, ser
   return await db.delete(profissionalServicos).where(
     and(eq(profissionalServicos.profissionalId, profissionalId), eq(profissionalServicos.servicoId, servicoId))
   );
+}
+
+export async function setServicosForProfissional(profissionalId: number, servicoIds: number[]) {
+  const db = await getDb();
+  if (!db) return undefined;
+  // Remove todas as associações existentes e recria
+  await db.delete(profissionalServicos).where(eq(profissionalServicos.profissionalId, profissionalId));
+  if (servicoIds.length === 0) return;
+  const rows = servicoIds.map((servicoId) => ({ profissionalId, servicoId }));
+  return await db.insert(profissionalServicos).values(rows);
 }
 
 // Verificar conflito de horário para um profissional
@@ -273,36 +325,65 @@ export async function verificarConflitoHorario(
   return false;
 }
 
-// Buscar agendamentos com dados completos (JOIN)
+// Buscar agendamentos com dados completos (JOIN) incluindo serviços
 export async function getAllAgendamentosCompletos() {
   const db = await getDb();
   if (!db) return [];
 
-  const result = await db
+  // Busca agendamentos com cliente e profissional
+  const ags = await db
     .select({
       id: agendamentos.id,
       dataHora: agendamentos.dataHora,
       duracao: agendamentos.duracao,
+      valorTotal: agendamentos.valorTotal,
       status: agendamentos.status,
       notas: agendamentos.notas,
       createdAt: agendamentos.createdAt,
       updatedAt: agendamentos.updatedAt,
       clienteId: agendamentos.clienteId,
       profissionalId: agendamentos.profissionalId,
-      servicoId: agendamentos.servicoId,
       clienteNome: clientes.nome,
       clienteTelefone: clientes.telefone,
       profissionalNome: profissionais.nome,
       profissionalEspecialidade: profissionais.especialidade,
-      servicoNome: servicos.nome,
-      servicoValor: servicos.valor,
     })
     .from(agendamentos)
     .leftJoin(clientes, eq(agendamentos.clienteId, clientes.id))
-    .leftJoin(profissionais, eq(agendamentos.profissionalId, profissionais.id))
-    .leftJoin(servicos, eq(agendamentos.servicoId, servicos.id));
+    .leftJoin(profissionais, eq(agendamentos.profissionalId, profissionais.id));
 
-  return result;
+  if (ags.length === 0) return [];
+
+  // Busca os serviços de todos os agendamentos de uma vez
+  const agIds = ags.map((a) => a.id);
+  const servicosVinculados = await db
+    .select({
+      agendamentoId: agendamentoServicos.agendamentoId,
+      servicoId: agendamentoServicos.servicoId,
+      servicoNome: servicos.nome,
+      servicoValor: servicos.valor,
+      servicoDuracao: servicos.duracao,
+    })
+    .from(agendamentoServicos)
+    .leftJoin(servicos, eq(agendamentoServicos.servicoId, servicos.id))
+    .where(inArray(agendamentoServicos.agendamentoId, agIds));
+
+  // Agrupa serviços por agendamentoId
+  const servicosPorAgendamento = new Map<number, typeof servicosVinculados>();
+  for (const sv of servicosVinculados) {
+    if (!servicosPorAgendamento.has(sv.agendamentoId)) {
+      servicosPorAgendamento.set(sv.agendamentoId, []);
+    }
+    servicosPorAgendamento.get(sv.agendamentoId)!.push(sv);
+  }
+
+  return ags.map((ag) => ({
+    ...ag,
+    servicos: servicosPorAgendamento.get(ag.id) ?? [],
+    // Compatibilidade: campo servicoNome com os nomes concatenados
+    servicoNome: (servicosPorAgendamento.get(ag.id) ?? []).map((s) => s.servicoNome).filter(Boolean).join(", "),
+    servicoValor: ag.valorTotal,
+  }));
 }
 
 // Estatísticas para o dashboard

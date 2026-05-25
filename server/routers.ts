@@ -84,8 +84,19 @@ export const appRouter = router({
         telefone: z.string().min(8, "Telefone inválido."),
         email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
         cidade: z.string().min(2, "Cidade é obrigatória."),
+        servicoIds: z.array(z.number().int().positive()).optional(),
       }))
-      .mutation(({ input }) => db.createProfissional(input)),
+      .mutation(async ({ input: { servicoIds, ...profData } }) => {
+        const result = await db.createProfissional(profData);
+        // Se vieram serviços, associar ao profissional recém-criado
+        if (servicoIds && servicoIds.length > 0 && result) {
+          const insertId = (result as any).insertId as number;
+          if (insertId) {
+            await db.setServicosForProfissional(insertId, servicoIds);
+          }
+        }
+        return result;
+      }),
 
     update: protectedProcedure
       .input(z.object({
@@ -95,11 +106,17 @@ export const appRouter = router({
         telefone: z.string().min(8).optional(),
         email: z.string().email().optional().or(z.literal("")),
         cidade: z.string().min(2).optional(),
+        servicoIds: z.array(z.number().int().positive()).optional(),
       }))
-      .mutation(async ({ input: { id, ...data } }) => {
+      .mutation(async ({ input: { id, servicoIds, ...data } }) => {
         const existe = await db.getProfissionalById(id);
         if (!existe) throw new TRPCError({ code: "NOT_FOUND", message: "Profissional não encontrado." });
-        return db.updateProfissional(id, data);
+        await db.updateProfissional(id, data);
+        // Atualiza as associações de serviços se fornecidas
+        if (servicoIds !== undefined) {
+          await db.setServicosForProfissional(id, servicoIds);
+        }
+        return { success: true };
       }),
 
     delete: protectedProcedure
@@ -171,9 +188,8 @@ export const appRouter = router({
       .input(z.object({
         clienteId: z.number().int().positive(),
         profissionalId: z.number().int().positive(),
-        servicoId: z.number().int().positive(),
+        servicoIds: z.array(z.number().int().positive()).min(1, "Selecione ao menos um serviço."),
         dataHora: z.date(),
-        duracao: z.number().int().min(5),
         notas: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
@@ -186,31 +202,44 @@ export const appRouter = router({
           });
         }
 
-        // ✅ Validação 2: Cliente, profissional e serviço devem existir
-        const [cliente, profissional, servico] = await Promise.all([
+        // ✅ Validação 2: Cliente e profissional devem existir
+        const [cliente, profissional] = await Promise.all([
           db.getClienteById(input.clienteId),
           db.getProfissionalById(input.profissionalId),
-          db.getServicoById(input.servicoId),
         ]);
         if (!cliente) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado." });
         if (!profissional) throw new TRPCError({ code: "NOT_FOUND", message: "Profissional não encontrado." });
-        if (!servico) throw new TRPCError({ code: "NOT_FOUND", message: "Serviço não encontrado." });
 
-        // ✅ Validação 3: Verificar se o profissional está associado ao serviço
-        const associacoes = await db.getServicosByProfissional(input.profissionalId);
-        const associado = associacoes.some((a) => a.servicoId === input.servicoId);
-        if (!associado) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `O profissional ${profissional.nome} não está habilitado para realizar o serviço "${servico.nome}". Configure as associações na página de Associações.`,
-          });
+        // ✅ Validação 3: Todos os serviços devem existir
+        const servicosData = await Promise.all(input.servicoIds.map((id) => db.getServicoById(id)));
+        for (let i = 0; i < servicosData.length; i++) {
+          if (!servicosData[i]) {
+            throw new TRPCError({ code: "NOT_FOUND", message: `Serviço ID ${input.servicoIds[i]} não encontrado.` });
+          }
         }
 
-        // ✅ Validação 4: Verificar conflito de horário para o profissional
+        // ✅ Validação 4: Profissional deve estar associado a todos os serviços
+        const associacoes = await db.getServicosByProfissional(input.profissionalId);
+        const servicosAssociadosIds = new Set(associacoes.map((a) => a.servicoId));
+        for (let i = 0; i < input.servicoIds.length; i++) {
+          if (!servicosAssociadosIds.has(input.servicoIds[i])) {
+            const servico = servicosData[i];
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `O profissional ${profissional.nome} não está habilitado para realizar o serviço "${servico?.nome}". Edite o profissional para adicionar este serviço.`,
+            });
+          }
+        }
+
+        // ✅ Calcula duração e valor total
+        const duracaoTotal = servicosData.reduce((sum, s) => sum + (s?.duracao ?? 0), 0);
+        const valorTotal = servicosData.reduce((sum, s) => sum + parseFloat(s?.valor ?? "0"), 0);
+
+        // ✅ Validação 5: Verificar conflito de horário para o profissional
         const temConflito = await db.verificarConflitoHorario(
           input.profissionalId,
           input.dataHora,
-          input.duracao
+          duracaoTotal
         );
         if (temConflito) {
           throw new TRPCError({
@@ -219,7 +248,25 @@ export const appRouter = router({
           });
         }
 
-        return db.createAgendamento(input);
+        // Cria o agendamento
+        const result = await db.createAgendamento({
+          clienteId: input.clienteId,
+          profissionalId: input.profissionalId,
+          dataHora: input.dataHora,
+          duracao: duracaoTotal,
+          valorTotal: valorTotal.toFixed(2),
+          notas: input.notas,
+        });
+
+        // Associa os serviços ao agendamento
+        if (result) {
+          const insertId = (result as any).insertId as number;
+          if (insertId) {
+            await db.addServicosToAgendamento(insertId, input.servicoIds);
+          }
+        }
+
+        return result;
       }),
 
     update: protectedProcedure
@@ -227,9 +274,7 @@ export const appRouter = router({
         id: z.number().int().positive(),
         clienteId: z.number().int().positive().optional(),
         profissionalId: z.number().int().positive().optional(),
-        servicoId: z.number().int().positive().optional(),
         dataHora: z.date().optional(),
-        duracao: z.number().int().min(5).optional(),
         status: z.enum(["confirmado", "cancelado", "concluido"]).optional(),
         notas: z.string().optional(),
       }))
@@ -249,7 +294,7 @@ export const appRouter = router({
 
           // ✅ Validação: Verificar conflito de horário ao reagendar
           const profId = data.profissionalId ?? agExistente.profissionalId;
-          const dur = data.duracao ?? agExistente.duracao;
+          const dur = agExistente.duracao;
           const temConflito = await db.verificarConflitoHorario(profId, data.dataHora, dur, id);
           if (temConflito) {
             throw new TRPCError({
@@ -300,6 +345,17 @@ export const appRouter = router({
         servicoId: z.number().int().positive(),
       }))
       .mutation(({ input }) => db.removerServicoFromProfissional(input.profissionalId, input.servicoId)),
+
+    setAll: protectedProcedure
+      .input(z.object({
+        profissionalId: z.number().int().positive(),
+        servicoIds: z.array(z.number().int().positive()),
+      }))
+      .mutation(async ({ input }) => {
+        const prof = await db.getProfissionalById(input.profissionalId);
+        if (!prof) throw new TRPCError({ code: "NOT_FOUND", message: "Profissional não encontrado." });
+        return db.setServicosForProfissional(input.profissionalId, input.servicoIds);
+      }),
   }),
 });
 
