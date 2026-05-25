@@ -41,3 +41,9 @@
 - [x] Frontend: listagem de agendamentos mostra múltiplos serviços
 - [x] Frontend: remover página de Associações e item do menu
 - [x] Testes: atualizar testes para múltiplos serviços (14 testes passando)
+
+## Melhorias v3
+- [x] Backend: endpoint para buscar profissionais habilitados para um conjunto de serviços
+- [x] Frontend: reordenar agendamento — Step 2 vira Serviços, Step 3 vira Profissional (filtrado)
+- [x] Frontend: Step 3 mostra apenas profissionais que realizam TODOS os serviços selecionados
+- [x] Testes: atualizar testes para novo fluxo (16 testes passando)

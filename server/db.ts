@@ -290,6 +290,37 @@ export async function setServicosForProfissional(profissionalId: number, servico
   return await db.insert(profissionalServicos).values(rows);
 }
 
+// Buscar profissionais que realizam TODOS os serviços de uma lista
+export async function getProfissionaisByServicos(servicoIds: number[]) {
+  const db = await getDb();
+  if (!db || servicoIds.length === 0) return [];
+
+  // Busca todos os profissionais ativos
+  const todosProfissionais = await db
+    .select()
+    .from(profissionais)
+    .where(eq(profissionais.ativo, true));
+
+  if (todosProfissionais.length === 0) return [];
+
+  // Busca todas as associações dos profissionais ativos
+  const profIds = todosProfissionais.map((p) => p.id);
+  const todasAssociacoes = await db
+    .select()
+    .from(profissionalServicos)
+    .where(inArray(profissionalServicos.profissionalId, profIds));
+
+  // Filtra apenas profissionais que possuem TODOS os serviços solicitados
+  return todosProfissionais.filter((prof) => {
+    const servicosDoProf = new Set(
+      todasAssociacoes
+        .filter((a) => a.profissionalId === prof.id)
+        .map((a) => a.servicoId)
+    );
+    return servicoIds.every((id) => servicosDoProf.has(id));
+  });
+}
+
 // Verificar conflito de horário para um profissional
 export async function verificarConflitoHorario(
   profissionalId: number,
