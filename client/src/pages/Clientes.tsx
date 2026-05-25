@@ -2,26 +2,67 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Trash2, Edit, Loader2, X, Check } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Loader2, X, Check, MapPin } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
+import { CidadeSelect } from "@/components/CidadeSelect";
 
+// ── Helpers de validação ──────────────────────────────────────────────────────
+const TELEFONE_REGEX = /^\(?\d{2}\)?[\s-]?\d{4,5}[\s-]?\d{4}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validarTelefone(tel: string): string | null {
+  const limpo = tel.replace(/\D/g, "");
+  if (!limpo) return null; // vazio é ok (não obrigatório em edição)
+  if (limpo.length < 10 || limpo.length > 11) return "Telefone deve ter 10 ou 11 dígitos (com DDD).";
+  if (!TELEFONE_REGEX.test(tel.trim())) return "Formato inválido. Use (11) 99999-9999 ou 11999999999.";
+  return null;
+}
+
+function validarEmail(email: string): string | null {
+  if (!email.trim()) return null; // opcional
+  if (!EMAIL_REGEX.test(email.trim())) return "E-mail inválido.";
+  return null;
+}
+
+// Máscara de telefone: (11) 99999-9999
+function mascaraTelefone(valor: string): string {
+  const nums = valor.replace(/\D/g, "").slice(0, 11);
+  if (nums.length <= 2) return nums.length ? `(${nums}` : "";
+  if (nums.length <= 6) return `(${nums.slice(0, 2)}) ${nums.slice(2)}`;
+  if (nums.length <= 10) return `(${nums.slice(0, 2)}) ${nums.slice(2, 6)}-${nums.slice(6)}`;
+  return `(${nums.slice(0, 2)}) ${nums.slice(2, 7)}-${nums.slice(7)}`;
+}
+
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 interface FormData {
   nome: string;
   telefone: string;
   email: string;
+  rua: string;
+  numero: string;
+  bairro: string;
   cidade: string;
-  endereco: string;
+  uf: string;
 }
 
-const emptyForm: FormData = { nome: "", telefone: "", email: "", cidade: "", endereco: "" };
+const emptyForm: FormData = {
+  nome: "", telefone: "", email: "",
+  rua: "", numero: "", bairro: "", cidade: "", uf: "",
+};
+
+interface FormErrors {
+  telefone?: string;
+  email?: string;
+}
 
 export default function Clientes() {
   const [busca, setBusca] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [formData, setFormData] = useState<FormData>(emptyForm);
+  const [errors, setErrors] = useState<FormErrors>({});
 
   const utils = trpc.useUtils();
   const { data: clientes = [], isLoading } = trpc.clientes.list.useQuery();
@@ -30,6 +71,7 @@ export default function Clientes() {
     onSuccess: () => {
       utils.clientes.list.invalidate();
       setFormData(emptyForm);
+      setErrors({});
       setShowForm(false);
       toast.success("Cliente cadastrado com sucesso!");
     },
@@ -41,6 +83,7 @@ export default function Clientes() {
       utils.clientes.list.invalidate();
       setEditId(null);
       setFormData(emptyForm);
+      setErrors({});
       toast.success("Cliente atualizado com sucesso!");
     },
     onError: (err) => toast.error(err.message),
@@ -56,18 +99,46 @@ export default function Clientes() {
 
   const clientesFiltrados = clientes.filter((c) =>
     c.nome.toLowerCase().includes(busca.toLowerCase()) ||
-    c.telefone.includes(busca)
+    c.telefone.includes(busca) ||
+    (c.email ?? "").toLowerCase().includes(busca.toLowerCase())
   );
 
+  const validarForm = (): boolean => {
+    const novoErrors: FormErrors = {};
+    const erroTel = validarTelefone(formData.telefone);
+    if (erroTel) novoErrors.telefone = erroTel;
+    const erroEmail = validarEmail(formData.email);
+    if (erroEmail) novoErrors.email = erroEmail;
+    setErrors(novoErrors);
+    return Object.keys(novoErrors).length === 0;
+  };
+
   const handleSave = () => {
-    if (!formData.nome.trim() || !formData.telefone.trim()) {
-      toast.error("Nome e telefone são obrigatórios.");
+    if (!formData.nome.trim()) {
+      toast.error("Nome é obrigatório.");
       return;
     }
+    if (!formData.telefone.trim()) {
+      toast.error("Telefone é obrigatório.");
+      return;
+    }
+    if (!validarForm()) return;
+
+    const payload = {
+      nome: formData.nome.trim(),
+      telefone: formData.telefone.trim(),
+      email: formData.email.trim() || undefined,
+      rua: formData.rua.trim() || undefined,
+      numero: formData.numero.trim() || undefined,
+      bairro: formData.bairro.trim() || undefined,
+      cidade: formData.cidade || undefined,
+      uf: formData.uf || undefined,
+    };
+
     if (editId !== null) {
-      updateMutation.mutate({ id: editId, ...formData });
+      updateMutation.mutate({ id: editId, ...payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload as Parameters<typeof createMutation.mutate>[0]);
     }
   };
 
@@ -77,9 +148,13 @@ export default function Clientes() {
       nome: cliente.nome,
       telefone: cliente.telefone,
       email: cliente.email ?? "",
+      rua: (cliente as any).rua ?? "",
+      numero: (cliente as any).numero ?? "",
+      bairro: (cliente as any).bairro ?? "",
       cidade: cliente.cidade ?? "",
-      endereco: cliente.endereco ?? "",
+      uf: (cliente as any).uf ?? "",
     });
+    setErrors({});
     setShowForm(true);
   };
 
@@ -87,9 +162,15 @@ export default function Clientes() {
     setShowForm(false);
     setEditId(null);
     setFormData(emptyForm);
+    setErrors({});
   };
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  const cidadeValue =
+    formData.uf && formData.cidade
+      ? { uf: formData.uf, cidade: formData.cidade }
+      : null;
 
   return (
     <DashboardLayout>
@@ -115,6 +196,7 @@ export default function Clientes() {
               <CardTitle>{editId ? "Editar Cliente" : "Novo Cliente"}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Nome e Telefone */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Nome *</label>
@@ -128,40 +210,102 @@ export default function Clientes() {
                 <div>
                   <label className="text-sm font-medium">Telefone *</label>
                   <Input
-                    placeholder="(11) 98765-4321"
+                    placeholder="(11) 99999-9999"
                     value={formData.telefone}
-                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                    className="mt-1"
+                    onChange={(e) => {
+                      const masked = mascaraTelefone(e.target.value);
+                      setFormData({ ...formData, telefone: masked });
+                      setErrors((prev) => ({ ...prev, telefone: undefined }));
+                    }}
+                    onBlur={() => {
+                      const err = validarTelefone(formData.telefone);
+                      setErrors((prev) => ({ ...prev, telefone: err ?? undefined }));
+                    }}
+                    className={`mt-1 ${errors.telefone ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                    maxLength={15}
                   />
+                  {errors.telefone && (
+                    <p className="text-xs text-destructive mt-1">{errors.telefone}</p>
+                  )}
                 </div>
+              </div>
+
+              {/* E-mail e Cidade */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">E-mail</label>
                   <Input
                     placeholder="email@exemplo.com"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="mt-1"
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      setErrors((prev) => ({ ...prev, email: undefined }));
+                    }}
+                    onBlur={() => {
+                      const err = validarEmail(formData.email);
+                      setErrors((prev) => ({ ...prev, email: err ?? undefined }));
+                    }}
+                    className={`mt-1 ${errors.email ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   />
+                  {errors.email && (
+                    <p className="text-xs text-destructive mt-1">{errors.email}</p>
+                  )}
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Cidade</label>
-                  <Input
-                    placeholder="São Paulo"
-                    value={formData.cidade}
-                    onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="text-sm font-medium">Endereço</label>
-                  <Input
-                    placeholder="Rua, número, bairro"
-                    value={formData.endereco}
-                    onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
-                    className="mt-1"
-                  />
+                  <label className="text-sm font-medium flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5" /> Cidade
+                  </label>
+                  <div className="mt-1">
+                    <CidadeSelect
+                      value={cidadeValue}
+                      onChange={(val) =>
+                        setFormData({
+                          ...formData,
+                          cidade: val?.cidade ?? "",
+                          uf: val?.uf ?? "",
+                        })
+                      }
+                    />
+                  </div>
                 </div>
               </div>
+
+              {/* Endereço: Rua, Número, Bairro */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide text-xs mb-2 block">
+                  Endereço
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium">Rua / Avenida</label>
+                    <Input
+                      placeholder="Rua das Flores"
+                      value={formData.rua}
+                      onChange={(e) => setFormData({ ...formData, rua: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Número</label>
+                    <Input
+                      placeholder="123"
+                      value={formData.numero}
+                      onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="text-sm font-medium">Bairro</label>
+                    <Input
+                      placeholder="Centro"
+                      value={formData.bairro}
+                      onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <Button onClick={handleSave} disabled={isSaving} className="gap-2">
                   {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -180,7 +324,7 @@ export default function Clientes() {
         <div className="mb-4 relative">
           <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome ou telefone..."
+            placeholder="Buscar por nome, telefone ou e-mail..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="pl-10"
@@ -200,37 +344,43 @@ export default function Clientes() {
               </div>
             ) : clientesFiltrados.length > 0 ? (
               <div className="space-y-2">
-                {clientesFiltrados.map((cliente) => (
-                  <div
-                    key={cliente.id}
-                    className="flex items-center justify-between p-4 bg-background rounded-lg border border-border hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">{cliente.nome}</p>
-                      <div className="text-sm text-muted-foreground flex gap-3 flex-wrap mt-0.5">
-                        <span>{cliente.telefone}</span>
-                        {cliente.email && <span>• {cliente.email}</span>}
-                        {cliente.cidade && <span>• {cliente.cidade}</span>}
+                {clientesFiltrados.map((cliente) => {
+                  const c = cliente as typeof cliente & { rua?: string; numero?: string; bairro?: string; uf?: string };
+                  const enderecoPartes = [c.rua, c.numero, c.bairro].filter(Boolean).join(", ");
+                  const localidade = [c.uf, c.cidade].filter(Boolean).join(" — ");
+                  return (
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between p-4 bg-background rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">{c.nome}</p>
+                        <div className="text-sm text-muted-foreground flex gap-3 flex-wrap mt-0.5">
+                          <span>{c.telefone}</span>
+                          {c.email && <span>• {c.email}</span>}
+                          {localidade && <span>• {localidade}</span>}
+                          {enderecoPartes && <span>• {enderecoPartes}</span>}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 ml-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(c)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm(`Remover o cliente "${c.nome}"?`)) {
+                              deleteMutation.mutate(c.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex gap-1 ml-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(cliente)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm(`Remover o cliente "${cliente.nome}"?`)) {
-                            deleteMutation.mutate(cliente.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-10">

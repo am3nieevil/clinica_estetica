@@ -47,3 +47,16 @@
 - [x] Frontend: reordenar agendamento — Step 2 vira Serviços, Step 3 vira Profissional (filtrado)
 - [x] Frontend: Step 3 mostra apenas profissionais que realizam TODOS os serviços selecionados
 - [x] Testes: atualizar testes para novo fluxo (16 testes passando)
+
+## Melhorias v4
+- [x] Banco: separar endereco em rua, numero, bairro nos clientes
+- [x] Banco: separar endereco em rua, numero, bairro nos profissionais
+- [x] Backend: atualizar routers/db para novos campos de endereço
+- [x] Frontend: componente CidadeSelect com busca (UF + cidade) para clientes e profissionais
+- [x] Frontend: formulário de Clientes com rua/numero/bairro e CidadeSelect
+- [x] Frontend: validação de telefone real (formato brasileiro) em Clientes
+- [x] Frontend: validação de e-mail real em Clientes
+- [x] Frontend: formulário de Profissionais com rua/numero/bairro e CidadeSelect
+- [x] Frontend: validação de telefone real em Profissionais
+- [x] Frontend: validação de e-mail real em Profissionais
+- [x] Testes: atualizar testes para novas validações (18 testes passando)
