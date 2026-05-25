@@ -32,11 +32,14 @@ export const appRouter = router({
     create: protectedProcedure
       .input(z.object({
         nome: z.string().min(2, "Nome deve ter ao menos 2 caracteres."),
-        email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
-        telefone: z.string().min(8, "Telefone inválido."),
+        email: z.string().email("E-mail inválido.").optional().or(z.literal("")).or(z.null()),
+        telefone: z.string().regex(/^\(?\d{2}\)?[\s-]?\d{4,5}[\s-]?\d{4}$/, "Telefone inválido. Use o formato (11) 99999-9999."),
         dataNascimento: z.date().optional(),
-        endereco: z.string().optional(),
+        rua: z.string().optional(),
+        numero: z.string().optional(),
+        bairro: z.string().optional(),
         cidade: z.string().optional(),
+        uf: z.string().length(2).optional(),
       }))
       .mutation(({ input }) => db.createCliente(input)),
 
@@ -44,11 +47,14 @@ export const appRouter = router({
       .input(z.object({
         id: z.number().int().positive(),
         nome: z.string().min(2).optional(),
-        email: z.string().email().optional().or(z.literal("")),
-        telefone: z.string().min(8).optional(),
+        email: z.string().email().optional().or(z.literal("")).or(z.null()),
+        telefone: z.string().regex(/^\(?\d{2}\)?[\s-]?\d{4,5}[\s-]?\d{4}$/, "Telefone inválido.").optional(),
         dataNascimento: z.date().optional(),
-        endereco: z.string().optional(),
+        rua: z.string().optional(),
+        numero: z.string().optional(),
+        bairro: z.string().optional(),
         cidade: z.string().optional(),
+        uf: z.string().length(2).optional(),
       }))
       .mutation(async ({ input: { id, ...data } }) => {
         const existe = await db.getClienteById(id);
@@ -81,9 +87,13 @@ export const appRouter = router({
       .input(z.object({
         nome: z.string().min(2, "Nome deve ter ao menos 2 caracteres."),
         especialidade: z.string().min(2, "Especialidade é obrigatória."),
-        telefone: z.string().min(8, "Telefone inválido."),
-        email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
-        cidade: z.string().min(2, "Cidade é obrigatória."),
+        telefone: z.string().regex(/^\(?\d{2}\)?[\s-]?\d{4,5}[\s-]?\d{4}$/, "Telefone inválido. Use o formato (11) 99999-9999."),
+        email: z.string().email("E-mail inválido.").optional().or(z.literal("")).or(z.null()),
+        rua: z.string().optional(),
+        numero: z.string().optional(),
+        bairro: z.string().optional(),
+        cidade: z.string().optional(),
+        uf: z.string().length(2).optional(),
         servicoIds: z.array(z.number().int().positive()).optional(),
       }))
       .mutation(async ({ input: { servicoIds, ...profData } }) => {
@@ -103,9 +113,13 @@ export const appRouter = router({
         id: z.number().int().positive(),
         nome: z.string().min(2).optional(),
         especialidade: z.string().min(2).optional(),
-        telefone: z.string().min(8).optional(),
-        email: z.string().email().optional().or(z.literal("")),
-        cidade: z.string().min(2).optional(),
+        telefone: z.string().regex(/^\(?\d{2}\)?[\s-]?\d{4,5}[\s-]?\d{4}$/, "Telefone inválido.").optional(),
+        email: z.string().email().optional().or(z.literal("")).or(z.null()),
+        rua: z.string().optional(),
+        numero: z.string().optional(),
+        bairro: z.string().optional(),
+        cidade: z.string().optional(),
+        uf: z.string().length(2).optional(),
         servicoIds: z.array(z.number().int().positive()).optional(),
       }))
       .mutation(async ({ input: { id, servicoIds, ...data } }) => {

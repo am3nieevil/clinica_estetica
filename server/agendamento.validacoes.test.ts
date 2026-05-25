@@ -308,12 +308,12 @@ describe("Validações de Cliente", () => {
     await expect(
       caller.clientes.create({
         nome: "A",
-        telefone: "11999999999",
+        telefone: "(11) 99999-9999",
       })
     ).rejects.toThrow();
   });
 
-  it("deve rejeitar cliente com telefone inválido", async () => {
+  it("deve rejeitar cliente com telefone inválido (muito curto)", async () => {
     const caller = appRouter.createCaller(createAuthContext());
 
     await expect(
@@ -321,16 +321,46 @@ describe("Validações de Cliente", () => {
         nome: "João Silva",
         telefone: "123",
       })
+    ).rejects.toThrow("Telefone inválido");
+  });
+
+  it("deve rejeitar cliente com e-mail inválido", async () => {
+    const caller = appRouter.createCaller(createAuthContext());
+
+    await expect(
+      caller.clientes.create({
+        nome: "João Silva",
+        telefone: "(11) 99999-9999",
+        email: "nao-e-um-email",
+      })
     ).rejects.toThrow();
   });
 
-  it("deve criar cliente com sucesso quando dados são válidos", async () => {
+  it("deve criar cliente com sucesso com telefone no formato (11) 99999-9999", async () => {
     const caller = appRouter.createCaller(createAuthContext());
 
     const resultado = await caller.clientes.create({
       nome: "Maria Oliveira",
-      telefone: "11999999999",
+      telefone: "(11) 99999-9999",
       email: "maria@email.com",
+    });
+
+    expect(resultado).toBeDefined();
+    expect(db.createCliente).toHaveBeenCalledOnce();
+  });
+
+  it("deve criar cliente com sucesso com telefone sem formatação (11999999999)", async () => {
+    const caller = appRouter.createCaller(createAuthContext());
+    vi.mocked(db.createCliente).mockClear();
+
+    const resultado = await caller.clientes.create({
+      nome: "Carlos Mendes",
+      telefone: "11999999999",
+      rua: "Rua das Flores",
+      numero: "123",
+      bairro: "Centro",
+      cidade: "São Paulo",
+      uf: "SP",
     });
 
     expect(resultado).toBeDefined();
