@@ -29,3 +29,15 @@
 - [x] Frontend: filtrar serviços pelo profissional selecionado no Step 3 do agendamento
 - [x] Frontend: resetar serviço selecionado ao trocar de profissional no formulário
 - [x] Teste unitário para validação de associação profissional-serviço
+
+## Melhorias v2
+- [x] Banco: criar tabela agendamento_servicos para múltiplos serviços por agendamento
+- [x] Banco: remover campo servicoId da tabela agendamentos
+- [x] Backend: router de profissional retorna serviços associados junto (getById com serviços)
+- [x] Backend: router de agendamento aceita array de servicoIds e calcula duracao/valor total
+- [x] Backend: validação de associação atualizada para múltiplos serviços
+- [x] Frontend: formulário de profissional com seção de serviços (checkboxes embutidos)
+- [x] Frontend: formulário de agendamento com seleção múltipla de serviços, valor e tempo totais
+- [x] Frontend: listagem de agendamentos mostra múltiplos serviços
+- [x] Frontend: remover página de Associações e item do menu
+- [x] Testes: atualizar testes para múltiplos serviços (14 testes passando)
