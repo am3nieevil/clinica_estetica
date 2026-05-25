@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, CheckCircle, Loader2, AlertCircle, Search, X, Check, Scissors } from "lucide-react";
+import { Calendar, Clock, CheckCircle, Loader2, AlertCircle, Search, X, Check, Scissors, UserCog } from "lucide-react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -23,25 +23,21 @@ export default function Agendamento() {
   });
   const [agendamentoConfirmado, setAgendamentoConfirmado] = useState(false);
 
-  // Estados de busca independentes por step
+  // Buscas independentes por step
   const [buscaCliente, setBuscaCliente] = useState("");
-  const [buscaProfissional, setBuscaProfissional] = useState("");
   const [buscaServico, setBuscaServico] = useState("");
+  const [buscaProfissional, setBuscaProfissional] = useState("");
 
+  // Dados base
   const { data: clientes = [], isLoading: loadingClientes } = trpc.clientes.list.useQuery();
-  const { data: profissionais = [], isLoading: loadingProf } = trpc.profissionais.list.useQuery();
   const { data: todosServicos = [], isLoading: loadingServicos } = trpc.servicos.list.useQuery();
 
-  // Busca os IDs dos serviços associados ao profissional selecionado
-  const { data: associacoesProfissional = [], isLoading: loadingAssociacoes } = trpc.profissionalServicos.getByProfissional.useQuery(
-    formData.profissionalId,
-    { enabled: formData.profissionalId > 0 }
-  );
-  const servicosAssociadosIds = new Set(associacoesProfissional.map((a) => a.servicoId));
-  // Filtra apenas serviços associados ao profissional selecionado
-  const servicosDoProf = formData.profissionalId > 0
-    ? todosServicos.filter((s) => servicosAssociadosIds.has(s.id))
-    : todosServicos;
+  // Profissionais filtrados pelos serviços selecionados (só busca quando há serviços)
+  const { data: profissionaisHabilitados = [], isLoading: loadingProf } =
+    trpc.profissionalServicos.getByServicos.useQuery(
+      formData.servicoIds,
+      { enabled: formData.servicoIds.length > 0 }
+    );
 
   const createMutation = trpc.agendamentos.create.useMutation({
     onSuccess: () => {
@@ -51,8 +47,9 @@ export default function Agendamento() {
     onError: (err) => toast.error(err.message),
   });
 
+  // Entidades selecionadas
   const clienteSelecionado = clientes.find((c) => c.id === formData.clienteId);
-  const profissionalSelecionado = profissionais.find((p) => p.id === formData.profissionalId);
+  const profissionalSelecionado = profissionaisHabilitados.find((p) => p.id === formData.profissionalId);
   const servicosSelecionados = todosServicos.filter((s) => formData.servicoIds.includes(s.id));
 
   // Totais calculados
@@ -78,28 +75,26 @@ export default function Agendamento() {
     );
   }, [clientes, buscaCliente]);
 
-  const profissionaisFiltrados = useMemo(() => {
-    const q = buscaProfissional.toLowerCase().trim();
-    if (!q) return profissionais.filter((p) => p.ativo);
-    return profissionais
-      .filter((p) => p.ativo)
-      .filter(
-        (p) =>
-          p.nome.toLowerCase().includes(q) ||
-          (p.especialidade ?? "").toLowerCase().includes(q) ||
-          (p.cidade ?? "").toLowerCase().includes(q)
-      );
-  }, [profissionais, buscaProfissional]);
-
   const servicosFiltrados = useMemo(() => {
     const q = buscaServico.toLowerCase().trim();
-    if (!q) return servicosDoProf;
-    return servicosDoProf.filter(
+    if (!q) return todosServicos;
+    return todosServicos.filter(
       (s) =>
         s.nome.toLowerCase().includes(q) ||
         (s.descricao ?? "").toLowerCase().includes(q)
     );
-  }, [servicosDoProf, buscaServico]);
+  }, [todosServicos, buscaServico]);
+
+  const profissionaisFiltrados = useMemo(() => {
+    const q = buscaProfissional.toLowerCase().trim();
+    if (!q) return profissionaisHabilitados;
+    return profissionaisHabilitados.filter(
+      (p) =>
+        p.nome.toLowerCase().includes(q) ||
+        (p.especialidade ?? "").toLowerCase().includes(q) ||
+        (p.cidade ?? "").toLowerCase().includes(q)
+    );
+  }, [profissionaisHabilitados, buscaProfissional]);
 
   // Validação de data mínima: hoje
   const hoje = new Date().toISOString().split("T")[0];
@@ -119,6 +114,8 @@ export default function Agendamento() {
       servicoIds: prev.servicoIds.includes(servicoId)
         ? prev.servicoIds.filter((id) => id !== servicoId)
         : [...prev.servicoIds, servicoId],
+      // Reseta o profissional ao mudar serviços (pode não ser mais habilitado)
+      profissionalId: 0,
     }));
   };
 
@@ -145,7 +142,7 @@ export default function Agendamento() {
     });
   };
 
-  // Componente de campo de busca reutilizável
+  // Campo de busca reutilizável
   const CampoBusca = ({
     value,
     onChange,
@@ -217,7 +214,7 @@ export default function Agendamento() {
           ))}
         </div>
 
-        {/* Step 1: Cliente */}
+        {/* ── Step 1: Cliente ─────────────────────────────────────────────── */}
         {step === 1 && (
           <Card>
             <CardHeader>
@@ -235,11 +232,7 @@ export default function Agendamento() {
                 </div>
               ) : (
                 <>
-                  <CampoBusca
-                    value={buscaCliente}
-                    onChange={setBuscaCliente}
-                    placeholder="Buscar por nome, telefone ou e-mail..."
-                  />
+                  <CampoBusca value={buscaCliente} onChange={setBuscaCliente} placeholder="Buscar por nome, telefone ou e-mail..." />
                   <div className="space-y-2 mb-6 max-h-72 overflow-y-auto pr-1">
                     {clientesFiltrados.length === 0 ? (
                       <div className="text-center py-6 text-muted-foreground text-sm">
@@ -273,65 +266,8 @@ export default function Agendamento() {
           </Card>
         )}
 
-        {/* Step 2: Profissional */}
+        {/* ── Step 2: Serviços ─────────────────────────────────────────────── */}
         {step === 2 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Selecione o Profissional</CardTitle>
-              <CardDescription>Busque pelo nome, especialidade ou cidade</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingProf ? (
-                <div className="flex justify-center py-6"><Loader2 className="w-6 h-6 animate-spin" /></div>
-              ) : profissionais.filter((p) => p.ativo).length === 0 ? (
-                <div className="text-center py-6">
-                  <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground">Nenhum profissional ativo cadastrado.</p>
-                  <Button variant="link" onClick={() => navigate("/profissionais")}>Cadastrar profissional</Button>
-                </div>
-              ) : (
-                <>
-                  <CampoBusca
-                    value={buscaProfissional}
-                    onChange={setBuscaProfissional}
-                    placeholder="Buscar por nome, especialidade ou cidade..."
-                  />
-                  <div className="space-y-2 mb-6 max-h-72 overflow-y-auto pr-1">
-                    {profissionaisFiltrados.length === 0 ? (
-                      <div className="text-center py-6 text-muted-foreground text-sm">
-                        Nenhum profissional encontrado para "{buscaProfissional}".
-                      </div>
-                    ) : (
-                      profissionaisFiltrados.map((p) => (
-                        <button
-                          key={p.id}
-                          onClick={() => setFormData({ ...formData, profissionalId: p.id, servicoIds: [] })}
-                          className={`w-full p-4 text-left rounded-lg border-2 transition-colors ${
-                            formData.profissionalId === p.id
-                              ? "border-primary bg-primary/10"
-                              : "border-border hover:border-primary/50"
-                          }`}
-                        >
-                          <p className="font-medium">{p.nome}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {p.especialidade}{p.cidade ? ` • ${p.cidade}` : ""}
-                          </p>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </>
-              )}
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Voltar</Button>
-                <Button onClick={() => setStep(3)} disabled={!formData.profissionalId} className="flex-1">Próximo</Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Step 3: Serviços (seleção múltipla) */}
-        {step === 3 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -339,26 +275,21 @@ export default function Agendamento() {
                 Selecione os Serviços
               </CardTitle>
               <CardDescription>
-                Serviços disponíveis para {profissionalSelecionado?.nome ?? "o profissional selecionado"} — selecione um ou mais
+                Escolha um ou mais procedimentos — o sistema mostrará os profissionais habilitados
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {loadingServicos || loadingAssociacoes ? (
+              {loadingServicos ? (
                 <div className="flex justify-center py-6"><Loader2 className="w-6 h-6 animate-spin" /></div>
-              ) : servicosDoProf.length === 0 ? (
+              ) : todosServicos.length === 0 ? (
                 <div className="text-center py-6">
                   <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground font-medium">Nenhum serviço associado a este profissional.</p>
-                  <p className="text-sm text-muted-foreground mt-1">Edite o profissional para adicionar serviços.</p>
-                  <Button variant="link" onClick={() => navigate("/profissionais")}>Ir para Profissionais</Button>
+                  <p className="text-muted-foreground">Nenhum serviço cadastrado.</p>
+                  <Button variant="link" onClick={() => navigate("/servicos")}>Cadastrar serviço</Button>
                 </div>
               ) : (
                 <>
-                  <CampoBusca
-                    value={buscaServico}
-                    onChange={setBuscaServico}
-                    placeholder="Buscar por nome ou descrição..."
-                  />
+                  <CampoBusca value={buscaServico} onChange={setBuscaServico} placeholder="Buscar por nome ou descrição..." />
                   <div className="space-y-2 mb-4 max-h-72 overflow-y-auto pr-1">
                     {servicosFiltrados.length === 0 ? (
                       <div className="text-center py-6 text-muted-foreground text-sm">
@@ -421,8 +352,8 @@ export default function Agendamento() {
                 </>
               )}
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep(2)} className="flex-1">Voltar</Button>
-                <Button onClick={() => setStep(4)} disabled={formData.servicoIds.length === 0} className="flex-1">
+                <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Voltar</Button>
+                <Button onClick={() => setStep(3)} disabled={formData.servicoIds.length === 0} className="flex-1">
                   Próximo
                 </Button>
               </div>
@@ -430,7 +361,92 @@ export default function Agendamento() {
           </Card>
         )}
 
-        {/* Step 4: Data, Hora e Confirmação */}
+        {/* ── Step 3: Profissional (filtrado pelos serviços) ───────────────── */}
+        {step === 3 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCog className="w-5 h-5" />
+                Selecione o Profissional
+              </CardTitle>
+              <CardDescription>
+                Profissionais habilitados para{" "}
+                {servicosSelecionados.length === 1
+                  ? `"${servicosSelecionados[0].nome}"`
+                  : `todos os ${servicosSelecionados.length} serviços selecionados`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingProf ? (
+                <div className="flex justify-center py-6"><Loader2 className="w-6 h-6 animate-spin" /></div>
+              ) : profissionaisHabilitados.length === 0 ? (
+                <div className="text-center py-6">
+                  <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground font-medium">
+                    Nenhum profissional habilitado para todos os serviços selecionados.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Tente selecionar menos serviços ou edite os profissionais para adicionar os serviços necessários.
+                  </p>
+                  <div className="flex gap-2 justify-center mt-3">
+                    <Button variant="outline" size="sm" onClick={() => setStep(2)}>
+                      Alterar serviços
+                    </Button>
+                    <Button variant="link" size="sm" onClick={() => navigate("/profissionais")}>
+                      Editar profissionais
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Serviços selecionados como referência */}
+                  <div className="flex flex-wrap gap-1 mb-4">
+                    {servicosSelecionados.map((s) => (
+                      <Badge key={s.id} variant="secondary" className="text-xs">
+                        <Scissors className="w-3 h-3 mr-1" />
+                        {s.nome}
+                      </Badge>
+                    ))}
+                  </div>
+
+                  <CampoBusca value={buscaProfissional} onChange={setBuscaProfissional} placeholder="Buscar por nome, especialidade ou cidade..." />
+                  <div className="space-y-2 mb-6 max-h-72 overflow-y-auto pr-1">
+                    {profissionaisFiltrados.length === 0 ? (
+                      <div className="text-center py-6 text-muted-foreground text-sm">
+                        Nenhum profissional encontrado para "{buscaProfissional}".
+                      </div>
+                    ) : (
+                      profissionaisFiltrados.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => setFormData({ ...formData, profissionalId: p.id })}
+                          className={`w-full p-4 text-left rounded-lg border-2 transition-colors ${
+                            formData.profissionalId === p.id
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <p className="font-medium">{p.nome}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {p.especialidade}{p.cidade ? ` • ${p.cidade}` : ""}
+                          </p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setStep(2)} className="flex-1">Voltar</Button>
+                <Button onClick={() => setStep(4)} disabled={!formData.profissionalId} className="flex-1">
+                  Próximo
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Step 4: Data, Hora e Confirmação ────────────────────────────── */}
         {step === 4 && (
           <Card>
             <CardHeader>

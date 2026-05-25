@@ -32,6 +32,7 @@ vi.mock("./db", () => ({
   removerServicoFromProfissional: vi.fn().mockResolvedValue({}),
   addServicosToAgendamento: vi.fn().mockResolvedValue({}),
   removeServicosFromAgendamento: vi.fn().mockResolvedValue({}),
+  getProfissionaisByServicos: vi.fn().mockResolvedValue([]),
   getDashboardStats: vi.fn().mockResolvedValue({ totalClientes: 0, totalProfissionais: 0, totalServicos: 0, agendamentosHoje: 0 }),
   upsertUser: vi.fn(),
   getUserByOpenId: vi.fn(),
@@ -235,6 +236,28 @@ describe("Validações de Agendamento", () => {
     );
     // Verifica que os serviços foram associados ao agendamento
     expect(db.addServicosToAgendamento).toHaveBeenCalledWith(1, [1, 2]);
+  });
+});
+
+describe("Endpoint getByServicos", () => {
+  it("deve retornar profissionais habilitados para os serviços informados", async () => {
+    vi.mocked(db.getProfissionaisByServicos).mockResolvedValue([mockProfissional]);
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const resultado = await caller.profissionalServicos.getByServicos([1, 2]);
+
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0].nome).toBe("Ana Souza");
+    expect(db.getProfissionaisByServicos).toHaveBeenCalledWith([1, 2]);
+  });
+
+  it("deve retornar lista vazia quando nenhum profissional é habilitado para todos os serviços", async () => {
+    vi.mocked(db.getProfissionaisByServicos).mockResolvedValue([]);
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const resultado = await caller.profissionalServicos.getByServicos([1, 2, 3]);
+
+    expect(resultado).toHaveLength(0);
   });
 });
 

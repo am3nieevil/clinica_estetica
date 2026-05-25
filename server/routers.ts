@@ -356,6 +356,11 @@ export const appRouter = router({
         if (!prof) throw new TRPCError({ code: "NOT_FOUND", message: "Profissional não encontrado." });
         return db.setServicosForProfissional(input.profissionalId, input.servicoIds);
       }),
+
+    // Retorna profissionais habilitados para TODOS os serviços informados
+    getByServicos: protectedProcedure
+      .input(z.array(z.number().int().positive()).min(1))
+      .query(({ input }) => db.getProfissionaisByServicos(input)),
   }),
 });
 
