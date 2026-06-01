@@ -321,6 +321,74 @@ export async function getProfissionaisByServicos(servicoIds: number[]) {
   });
 }
 
+// Verificar se um cliente possui agendamentos ativos (para bloquear exclusão)
+export async function clienteTemAgendamentos(clienteId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db
+    .select({ id: agendamentos.id })
+    .from(agendamentos)
+    .where(
+      and(
+        eq(agendamentos.clienteId, clienteId),
+        eq(agendamentos.status, "confirmado")
+      )
+    )
+    .limit(1);
+  return result.length > 0;
+}
+
+// Verificar se um profissional possui agendamentos ativos (para bloquear exclusão)
+export async function profissionalTemAgendamentos(profissionalId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db
+    .select({ id: agendamentos.id })
+    .from(agendamentos)
+    .where(
+      and(
+        eq(agendamentos.profissionalId, profissionalId),
+        eq(agendamentos.status, "confirmado")
+      )
+    )
+    .limit(1);
+  return result.length > 0;
+}
+
+// Verificar conflito de horário para um cliente
+export async function verificarConflitoHorarioCliente(
+  clienteId: number,
+  dataHora: Date,
+  duracao: number,
+  excludeId?: number
+) {
+  const db = await getDb();
+  if (!db) return false;
+
+  const novoInicio = dataHora.getTime();
+  const novoFim = novoInicio + duracao * 60 * 1000;
+
+  const agendamentosExistentes = await db
+    .select()
+    .from(agendamentos)
+    .where(
+      and(
+        eq(agendamentos.clienteId, clienteId),
+        eq(agendamentos.status, "confirmado")
+      )
+    );
+
+  for (const ag of agendamentosExistentes) {
+    if (excludeId && ag.id === excludeId) continue;
+    const existInicio = ag.dataHora.getTime();
+    const existFim = existInicio + ag.duracao * 60 * 1000;
+    if (novoInicio < existFim && novoFim > existInicio) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Verificar conflito de horário para um profissional
 export async function verificarConflitoHorario(
   profissionalId: number,

@@ -67,6 +67,14 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const existe = await db.getClienteById(input);
         if (!existe) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado." });
+        // ✅ Validação: não pode excluir cliente com agendamentos confirmados
+        const temAgendamentos = await db.clienteTemAgendamentos(input);
+        if (temAgendamentos) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Não é possível excluir este cliente pois ele possui agendamentos confirmados. Cancele ou conclua os agendamentos antes de excluir.",
+          });
+        }
         return db.deleteCliente(input);
       }),
   }),
@@ -138,6 +146,14 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const existe = await db.getProfissionalById(input);
         if (!existe) throw new TRPCError({ code: "NOT_FOUND", message: "Profissional não encontrado." });
+        // ✅ Validação: não pode excluir profissional com agendamentos confirmados
+        const temAgendamentos = await db.profissionalTemAgendamentos(input);
+        if (temAgendamentos) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Não é possível excluir este profissional pois ele possui agendamentos confirmados. Cancele ou conclua os agendamentos antes de excluir.",
+          });
+        }
         return db.deleteProfissional(input);
       }),
   }),
@@ -250,15 +266,28 @@ export const appRouter = router({
         const valorTotal = servicosData.reduce((sum, s) => sum + parseFloat(s?.valor ?? "0"), 0);
 
         // ✅ Validação 5: Verificar conflito de horário para o profissional
-        const temConflito = await db.verificarConflitoHorario(
+        const temConflitoProfissional = await db.verificarConflitoHorario(
           input.profissionalId,
           input.dataHora,
           duracaoTotal
         );
-        if (temConflito) {
+        if (temConflitoProfissional) {
           throw new TRPCError({
             code: "CONFLICT",
             message: `O profissional ${profissional.nome} já possui um agendamento neste horário. Por favor, escolha outro horário.`,
+          });
+        }
+
+        // ✅ Validação 6: Verificar conflito de horário para o cliente
+        const temConflitoCliente = await db.verificarConflitoHorarioCliente(
+          input.clienteId,
+          input.dataHora,
+          duracaoTotal
+        );
+        if (temConflitoCliente) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: `O cliente ${cliente.nome} já possui um agendamento neste horário. Por favor, escolha outro horário.`,
           });
         }
 
@@ -306,14 +335,24 @@ export const appRouter = router({
             });
           }
 
-          // ✅ Validação: Verificar conflito de horário ao reagendar
+          // ✅ Validação: Verificar conflito de horário ao reagendar (profissional)
           const profId = data.profissionalId ?? agExistente.profissionalId;
           const dur = agExistente.duracao;
-          const temConflito = await db.verificarConflitoHorario(profId, data.dataHora, dur, id);
-          if (temConflito) {
+          const temConflitoProfUpdate = await db.verificarConflitoHorario(profId, data.dataHora, dur, id);
+          if (temConflitoProfUpdate) {
             throw new TRPCError({
               code: "CONFLICT",
               message: "O profissional já possui um agendamento neste horário. Por favor, escolha outro horário.",
+            });
+          }
+
+          // ✅ Validação: Verificar conflito de horário ao reagendar (cliente)
+          const cliId = data.clienteId ?? agExistente.clienteId;
+          const temConflitoCliUpdate = await db.verificarConflitoHorarioCliente(cliId, data.dataHora, dur, id);
+          if (temConflitoCliUpdate) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "O cliente já possui um agendamento neste horário. Por favor, escolha outro horário.",
             });
           }
         }

@@ -60,3 +60,13 @@
 - [x] Frontend: validação de telefone real em Profissionais
 - [x] Frontend: validação de e-mail real em Profissionais
 - [x] Testes: atualizar testes para novas validações (18 testes passando)
+
+## Correções v5
+- [x] Backend: validar conflito de horário por cliente (mesmo cliente não pode ter dois agendamentos sobrepostos)
+- [x] Backend: bloquear exclusão de cliente que possua agendamentos vinculados
+- [x] Backend: bloquear exclusão de profissional que possua agendamentos vinculados
+- [x] Testes: cobrir conflito de horário por cliente
+- [x] Testes: cobrir bloqueio de exclusão de cliente com agendamentos
+- [x] Testes: cobrir bloqueio de exclusão de profissional com agendamentos
+- [x] Documentação: adicionar RN7 e RN8 nas regras de negócio
+- [x] Documentação: atualizar descrição dos RF1, RF2 e RF5
