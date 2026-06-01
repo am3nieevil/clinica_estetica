@@ -30,6 +30,10 @@ vi.mock("./db", () => ({
   verificarConflitoHorarioCliente: vi.fn().mockResolvedValue(false),
   clienteTemAgendamentos: vi.fn().mockResolvedValue(false),
   profissionalTemAgendamentos: vi.fn().mockResolvedValue(false),
+  clienteTelefoneExiste: vi.fn().mockResolvedValue(false),
+  clienteEmailExiste: vi.fn().mockResolvedValue(false),
+  profissionalTelefoneExiste: vi.fn().mockResolvedValue(false),
+  profissionalEmailExiste: vi.fn().mockResolvedValue(false),
   getServicosByProfissional: vi.fn().mockResolvedValue([]),
   associarServicoToProfissional: vi.fn().mockResolvedValue({}),
   removerServicoFromProfissional: vi.fn().mockResolvedValue({}),
@@ -375,6 +379,97 @@ describe("Exclusão de Profissional com Agendamentos", () => {
   });
 });
 
+describe("Unicidade de Telefone e E-mail em Clientes", () => {
+  it("deve rejeitar cliente com telefone já cadastrado", async () => {
+    vi.mocked(db.clienteTelefoneExiste).mockResolvedValue(true); // telefone já existe
+
+    const caller = appRouter.createCaller(createAuthContext());
+
+    await expect(
+      caller.clientes.create({
+        nome: "João Silva",
+        telefone: "(11) 99999-9999",
+      })
+    ).rejects.toThrow("Já existe um cliente cadastrado com este telefone");
+  });
+
+  it("deve rejeitar cliente com e-mail já cadastrado", async () => {
+    vi.mocked(db.clienteTelefoneExiste).mockResolvedValue(false);
+    vi.mocked(db.clienteEmailExiste).mockResolvedValue(true); // email já existe
+
+    const caller = appRouter.createCaller(createAuthContext());
+
+    await expect(
+      caller.clientes.create({
+        nome: "João Silva",
+        telefone: "(11) 99999-9999",
+        email: "duplicado@email.com",
+      })
+    ).rejects.toThrow("Já existe um cliente cadastrado com este e-mail");
+  });
+
+  it("deve rejeitar edição de cliente com telefone já usado por outro", async () => {
+    vi.mocked(db.getClienteById).mockResolvedValue(mockCliente);
+    vi.mocked(db.clienteTelefoneExiste).mockResolvedValue(true); // outro cliente tem esse telefone
+
+    const caller = appRouter.createCaller(createAuthContext());
+
+    await expect(
+      caller.clientes.update({
+        id: 1,
+        telefone: "(11) 88888-8888",
+      })
+    ).rejects.toThrow("Já existe outro cliente cadastrado com este telefone");
+  });
+});
+
+describe("Unicidade de Telefone e E-mail em Profissionais", () => {
+  it("deve rejeitar profissional com telefone já cadastrado", async () => {
+    vi.mocked(db.profissionalTelefoneExiste).mockResolvedValue(true); // telefone já existe
+
+    const caller = appRouter.createCaller(createAuthContext());
+
+    await expect(
+      caller.profissionais.create({
+        nome: "Ana Souza",
+        especialidade: "Estética",
+        telefone: "(11) 88888-8888",
+      })
+    ).rejects.toThrow("Já existe um profissional cadastrado com este telefone");
+  });
+
+  it("deve rejeitar profissional com e-mail já cadastrado", async () => {
+    vi.mocked(db.profissionalTelefoneExiste).mockResolvedValue(false);
+    vi.mocked(db.profissionalEmailExiste).mockResolvedValue(true); // email já existe
+
+    const caller = appRouter.createCaller(createAuthContext());
+
+    await expect(
+      caller.profissionais.create({
+        nome: "Ana Souza",
+        especialidade: "Estética",
+        telefone: "(11) 88888-8888",
+        email: "duplicado@email.com",
+      })
+    ).rejects.toThrow("Já existe um profissional cadastrado com este e-mail");
+  });
+
+  it("deve rejeitar edição de profissional com e-mail já usado por outro", async () => {
+    vi.mocked(db.getProfissionalById).mockResolvedValue(mockProfissional);
+    vi.mocked(db.profissionalTelefoneExiste).mockResolvedValue(false);
+    vi.mocked(db.profissionalEmailExiste).mockResolvedValue(true); // outro profissional tem esse email
+
+    const caller = appRouter.createCaller(createAuthContext());
+
+    await expect(
+      caller.profissionais.update({
+        id: 1,
+        email: "duplicado@email.com",
+      })
+    ).rejects.toThrow("Já existe outro profissional cadastrado com este e-mail");
+  });
+});
+
 describe("Validações de Cliente", () => {
   it("deve rejeitar cliente com nome muito curto", async () => {
     const caller = appRouter.createCaller(createAuthContext());
@@ -411,6 +506,8 @@ describe("Validações de Cliente", () => {
   });
 
   it("deve criar cliente com sucesso com telefone no formato (11) 99999-9999", async () => {
+    vi.mocked(db.clienteTelefoneExiste).mockResolvedValue(false);
+    vi.mocked(db.clienteEmailExiste).mockResolvedValue(false);
     const caller = appRouter.createCaller(createAuthContext());
 
     const resultado = await caller.clientes.create({
@@ -424,6 +521,8 @@ describe("Validações de Cliente", () => {
   });
 
   it("deve criar cliente com sucesso com telefone sem formatação (11999999999)", async () => {
+    vi.mocked(db.clienteTelefoneExiste).mockResolvedValue(false);
+    vi.mocked(db.clienteEmailExiste).mockResolvedValue(false);
     const caller = appRouter.createCaller(createAuthContext());
     vi.mocked(db.createCliente).mockClear();
 

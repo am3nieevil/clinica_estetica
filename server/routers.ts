@@ -41,7 +41,19 @@ export const appRouter = router({
         cidade: z.string().optional(),
         uf: z.string().length(2).optional(),
       }))
-      .mutation(({ input }) => db.createCliente(input)),
+      .mutation(async ({ input }) => {
+        // Normalizar telefone: somente dígitos para garantir unicidade independente de máscara
+        const telefoneLimpo = input.telefone.replace(/\D/g, "");
+        // ✅ Validação: telefone único
+        if (await db.clienteTelefoneExiste(telefoneLimpo)) {
+          throw new TRPCError({ code: "CONFLICT", message: "Já existe um cliente cadastrado com este telefone." });
+        }
+        // ✅ Validação: e-mail único
+        if (input.email && input.email !== "" && await db.clienteEmailExiste(input.email)) {
+          throw new TRPCError({ code: "CONFLICT", message: "Já existe um cliente cadastrado com este e-mail." });
+        }
+        return db.createCliente({ ...input, telefone: telefoneLimpo });
+      }),
 
     update: protectedProcedure
       .input(z.object({
@@ -59,6 +71,16 @@ export const appRouter = router({
       .mutation(async ({ input: { id, ...data } }) => {
         const existe = await db.getClienteById(id);
         if (!existe) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado." });
+        // Normalizar telefone se fornecido
+        if (data.telefone) data.telefone = data.telefone.replace(/\D/g, "");
+        // ✅ Validação: telefone único (excluindo o próprio)
+        if (data.telefone && await db.clienteTelefoneExiste(data.telefone, id)) {
+          throw new TRPCError({ code: "CONFLICT", message: "Já existe outro cliente cadastrado com este telefone." });
+        }
+        // ✅ Validação: e-mail único (excluindo o próprio)
+        if (data.email && data.email !== "" && await db.clienteEmailExiste(data.email, id)) {
+          throw new TRPCError({ code: "CONFLICT", message: "Já existe outro cliente cadastrado com este e-mail." });
+        }
         return db.updateCliente(id, data);
       }),
 
@@ -105,6 +127,16 @@ export const appRouter = router({
         servicoIds: z.array(z.number().int().positive()).optional(),
       }))
       .mutation(async ({ input: { servicoIds, ...profData } }) => {
+        // Normalizar telefone: somente dígitos
+        profData.telefone = profData.telefone.replace(/\D/g, "");
+        // ✅ Validação: telefone único
+        if (await db.profissionalTelefoneExiste(profData.telefone)) {
+          throw new TRPCError({ code: "CONFLICT", message: "Já existe um profissional cadastrado com este telefone." });
+        }
+        // ✅ Validação: e-mail único
+        if (profData.email && profData.email !== "" && await db.profissionalEmailExiste(profData.email)) {
+          throw new TRPCError({ code: "CONFLICT", message: "Já existe um profissional cadastrado com este e-mail." });
+        }
         const result = await db.createProfissional(profData);
         // Se vieram serviços, associar ao profissional recém-criado
         if (servicoIds && servicoIds.length > 0 && result) {
@@ -133,6 +165,16 @@ export const appRouter = router({
       .mutation(async ({ input: { id, servicoIds, ...data } }) => {
         const existe = await db.getProfissionalById(id);
         if (!existe) throw new TRPCError({ code: "NOT_FOUND", message: "Profissional não encontrado." });
+        // Normalizar telefone se fornecido
+        if (data.telefone) data.telefone = data.telefone.replace(/\D/g, "");
+        // ✅ Validação: telefone único (excluindo o próprio)
+        if (data.telefone && await db.profissionalTelefoneExiste(data.telefone, id)) {
+          throw new TRPCError({ code: "CONFLICT", message: "Já existe outro profissional cadastrado com este telefone." });
+        }
+        // ✅ Validação: e-mail único (excluindo o próprio)
+        if (data.email && data.email !== "" && await db.profissionalEmailExiste(data.email, id)) {
+          throw new TRPCError({ code: "CONFLICT", message: "Já existe outro profissional cadastrado com este e-mail." });
+        }
         await db.updateProfissional(id, data);
         // Atualiza as associações de serviços se fornecidas
         if (servicoIds !== undefined) {

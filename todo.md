@@ -70,3 +70,16 @@
 - [x] Testes: cobrir bloqueio de exclusão de profissional com agendamentos
 - [x] Documentação: adicionar RN7 e RN8 nas regras de negócio
 - [x] Documentação: atualizar descrição dos RF1, RF2 e RF5
+
+## Correções v6
+- [x] Banco: adicionar constraint UNIQUE em clientes.telefone
+- [x] Banco: adicionar constraint UNIQUE em clientes.email
+- [x] Banco: adicionar constraint UNIQUE em profissionais.telefone
+- [x] Banco: adicionar constraint UNIQUE em profissionais.email
+- [x] Backend: validar duplicidade de telefone/e-mail ao criar cliente
+- [x] Backend: validar duplicidade de telefone/e-mail ao editar cliente
+- [x] Backend: validar duplicidade de telefone/e-mail ao criar profissional
+- [x] Backend: validar duplicidade de telefone/e-mail ao editar profissional
+- [x] Testes: cobrir tentativa de cadastro com telefone duplicado
+- [x] Testes: cobrir tentativa de cadastro com e-mail duplicado
+- [x] Documentação: adicionar RN9 (unicidade de telefone e e-mail)
