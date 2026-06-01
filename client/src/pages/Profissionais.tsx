@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Trash2, Edit, Loader2, X, Check, Scissors, MapPin } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Loader2, X, Check, Scissors, MapPin, Eye } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -73,6 +74,7 @@ export default function Profissionais() {
   const [editId, setEditId] = useState<number | null>(null);
   const [formData, setFormData] = useState<FormData>(emptyForm);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [viewProfId, setViewProfId] = useState<number | null>(null);
 
   const utils = trpc.useUtils();
   const { data: profissionais = [], isLoading } = trpc.profissionais.list.useQuery();
@@ -450,6 +452,7 @@ export default function Profissionais() {
                   <ProfissionalItem
                     key={prof.id}
                     prof={prof}
+                    onView={(id) => setViewProfId(id)}
                     onEdit={handleEditWithServicos}
                     onDelete={(id) => { if (confirm(`Remover "${prof.nome}"?`)) deleteMutation.mutate(id); }}
                   />
@@ -470,17 +473,123 @@ export default function Profissionais() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal de Visualização */}
+      {viewProfId !== null && (
+        <ProfissionalViewModal
+          profId={viewProfId}
+          todosServicos={todosServicos}
+          onClose={() => setViewProfId(null)}
+          onEdit={(prof) => { setViewProfId(null); handleEditWithServicos(prof); }}
+        />
+      )}
     </DashboardLayout>
+  );
+}
+
+// ── Modal de Visualização somente leitura ───────────────────────────────────────────
+function ProfissionalViewModal({
+  profId,
+  todosServicos,
+  onClose,
+  onEdit,
+}: {
+  profId: number;
+  todosServicos: { id: number; nome: string; duracao: number; valor: string }[];
+  onClose: () => void;
+  onEdit: (prof: ProfItem) => void;
+}) {
+  const { data: profissionais = [] } = trpc.profissionais.list.useQuery();
+  const { data: associacoes = [] } = trpc.profissionalServicos.getByProfissional.useQuery(profId);
+  const prof = profissionais.find((p) => p.id === profId) as ProfItem | undefined;
+  const servicosDoProf = todosServicos.filter((s) => associacoes.some((a) => a.servicoId === s.id));
+
+  if (!prof) return null;
+  const localidade = [prof.uf, prof.cidade].filter(Boolean).join(" — ");
+  const enderecoPartes = [prof.rua, prof.numero].filter(Boolean).join(", ");
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Eye className="w-5 h-5" />
+            Detalhes do Profissional
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Nome</p>
+              <p className="font-medium text-foreground flex items-center gap-2">
+                {prof.nome}
+                <Badge variant={prof.ativo ? "default" : "secondary"}>{prof.ativo ? "Ativo" : "Inativo"}</Badge>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Especialidade</p>
+              <p className="text-foreground">{prof.especialidade || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Telefone</p>
+              <p className="text-foreground">{prof.telefone || "—"}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">E-mail</p>
+              <p className="text-foreground">{prof.email || "—"}</p>
+            </div>
+            {(prof.rua || prof.bairro) && (
+              <div className="col-span-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Endereço</p>
+                <p className="text-foreground">{[enderecoPartes, prof.bairro].filter(Boolean).join(" — ")}</p>
+              </div>
+            )}
+            {localidade && (
+              <div className="col-span-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cidade / UF</p>
+                <p className="text-foreground">{localidade}</p>
+              </div>
+            )}
+            <div className="col-span-2">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Serviços que realiza</p>
+              {servicosDoProf.length > 0 ? (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {servicosDoProf.map((s) => (
+                    <Badge key={s.id} variant="outline" className="text-xs">
+                      <Scissors className="w-3 h-3 mr-1" />{s.nome}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">Nenhum serviço associado</p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cadastrado em</p>
+              <p className="text-foreground">{new Date(prof.createdAt).toLocaleDateString("pt-BR")}</p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={onClose}>Fechar</Button>
+            <Button onClick={() => onEdit(prof)} className="gap-2">
+              <Edit className="w-4 h-4" /> Editar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 // ── Sub-componente que busca os serviços do profissional individualmente ──────
 function ProfissionalItem({
   prof,
+  onView,
   onEdit,
   onDelete,
 }: {
   prof: ProfItem;
+  onView: (id: number) => void;
   onEdit: (prof: ProfItem) => void;
   onDelete: (id: number) => void;
 }) {
@@ -520,10 +629,13 @@ function ProfissionalItem({
           )}
         </div>
         <div className="flex gap-1 ml-2 flex-shrink-0">
-          <Button variant="ghost" size="sm" onClick={() => onEdit(prof)}>
+          <Button variant="ghost" size="sm" onClick={() => onView(prof.id)} title="Visualizar">
+            <Eye className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => onEdit(prof)} title="Editar">
             <Edit className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => onDelete(prof.id)}>
+          <Button variant="ghost" size="sm" onClick={() => onDelete(prof.id)} title="Excluir">
             <Trash2 className="w-4 h-4 text-destructive" />
           </Button>
         </div>

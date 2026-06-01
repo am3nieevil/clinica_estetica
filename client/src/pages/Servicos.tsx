@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Trash2, Edit, Loader2, X, Check, Clock } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Loader2, X, Check, Clock, Eye } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -16,11 +17,17 @@ interface FormData {
 
 const emptyForm: FormData = { nome: "", descricao: "", valor: "", duracao: "" };
 
+type ServicoItem = {
+  id: number; nome: string; descricao: string | null; valor: string;
+  duracao: number; ativo: boolean; createdAt: Date; updatedAt: Date;
+};
+
 export default function Servicos() {
   const [busca, setBusca] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [formData, setFormData] = useState<FormData>(emptyForm);
+  const [viewServico, setViewServico] = useState<ServicoItem | null>(null);
 
   const utils = trpc.useUtils();
   const { data: servicos = [], isLoading } = trpc.servicos.list.useQuery();
@@ -81,7 +88,7 @@ export default function Servicos() {
     }
   };
 
-  const handleEdit = (serv: typeof servicos[0]) => {
+  const handleEdit = (serv: ServicoItem) => {
     setEditId(serv.id);
     setFormData({ nome: serv.nome, descricao: serv.descricao ?? "", valor: serv.valor, duracao: serv.duracao.toString() });
     setShowForm(true);
@@ -180,10 +187,13 @@ export default function Servicos() {
                       </div>
                     </div>
                     <div className="flex gap-1 ml-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(serv)}>
+                      <Button variant="ghost" size="sm" onClick={() => setViewServico(serv as ServicoItem)} title="Visualizar">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(serv as ServicoItem)} title="Editar">
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="sm"
+                      <Button variant="ghost" size="sm" title="Excluir"
                         onClick={() => { if (confirm(`Remover o serviço "${serv.nome}"?`)) deleteMutation.mutate(serv.id); }}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
@@ -206,6 +216,60 @@ export default function Servicos() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal de Visualização */}
+      <Dialog open={!!viewServico} onOpenChange={(open) => { if (!open) setViewServico(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              Detalhes do Serviço
+            </DialogTitle>
+          </DialogHeader>
+          {viewServico && (
+            <div className="space-y-4 mt-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Nome</p>
+                  <p className="font-medium text-foreground">{viewServico.nome}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Valor</p>
+                  <p className="text-foreground font-semibold text-primary">
+                    R$ {parseFloat(viewServico.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Duração</p>
+                  <p className="text-foreground flex items-center gap-1">
+                    <Clock className="w-4 h-4" /> {viewServico.duracao} minutos
+                  </p>
+                </div>
+                {viewServico.descricao && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Descrição</p>
+                    <p className="text-foreground">{viewServico.descricao}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cadastrado em</p>
+                  <p className="text-foreground">{new Date(viewServico.createdAt).toLocaleDateString("pt-BR")}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Última atualização</p>
+                  <p className="text-foreground">{new Date(viewServico.updatedAt).toLocaleDateString("pt-BR")}</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button variant="outline" onClick={() => setViewServico(null)}>Fechar</Button>
+                <Button onClick={() => { const s = viewServico; setViewServico(null); handleEdit(s); }} className="gap-2">
+                  <Edit className="w-4 h-4" /> Editar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

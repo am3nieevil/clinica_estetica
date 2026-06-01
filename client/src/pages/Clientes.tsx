@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Trash2, Edit, Loader2, X, Check, MapPin } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Loader2, X, Check, MapPin, Eye } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -63,6 +64,7 @@ export default function Clientes() {
   const [editId, setEditId] = useState<number | null>(null);
   const [formData, setFormData] = useState<FormData>(emptyForm);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [viewCliente, setViewCliente] = useState<typeof clientes[0] | null>(null);
 
   const utils = trpc.useUtils();
   const { data: clientes = [], isLoading } = trpc.clientes.list.useQuery();
@@ -363,7 +365,10 @@ export default function Clientes() {
                         </div>
                       </div>
                       <div className="flex gap-1 ml-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(c)}>
+                        <Button variant="ghost" size="sm" onClick={() => setViewCliente(c)} title="Visualizar">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(c)} title="Editar">
                           <Edit className="w-4 h-4" />
                         </Button>
                         <Button
@@ -398,6 +403,69 @@ export default function Clientes() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal de Visualização */}
+      <Dialog open={!!viewCliente} onOpenChange={(open) => { if (!open) setViewCliente(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              Detalhes do Cliente
+            </DialogTitle>
+          </DialogHeader>
+          {viewCliente && (() => {
+            const c = viewCliente as typeof viewCliente & { rua?: string; numero?: string; bairro?: string; uf?: string; dataNascimento?: string };
+            const enderecoPartes = [c.rua, c.numero].filter(Boolean).join(", ");
+            const localidade = [c.uf, c.cidade].filter(Boolean).join(" — ");
+            return (
+              <div className="space-y-4 mt-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Nome</p>
+                    <p className="font-medium text-foreground">{c.nome}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Telefone</p>
+                    <p className="text-foreground">{c.telefone || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">E-mail</p>
+                    <p className="text-foreground">{c.email || "—"}</p>
+                  </div>
+                  {c.dataNascimento && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Data de Nascimento</p>
+                      <p className="text-foreground">{new Date(c.dataNascimento).toLocaleDateString("pt-BR")}</p>
+                    </div>
+                  )}
+                  {(c.rua || c.bairro) && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Endereço</p>
+                      <p className="text-foreground">{[enderecoPartes, c.bairro].filter(Boolean).join(" — ")}</p>
+                    </div>
+                  )}
+                  {localidade && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cidade / UF</p>
+                      <p className="text-foreground">{localidade}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cadastrado em</p>
+                    <p className="text-foreground">{new Date(c.createdAt).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <Button variant="outline" onClick={() => setViewCliente(null)}>Fechar</Button>
+                  <Button onClick={() => { setViewCliente(null); handleEdit(viewCliente); }} className="gap-2">
+                    <Edit className="w-4 h-4" /> Editar
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

@@ -83,3 +83,9 @@
 - [x] Testes: cobrir tentativa de cadastro com telefone duplicado
 - [x] Testes: cobrir tentativa de cadastro com e-mail duplicado
 - [x] Documentação: adicionar RN9 (unicidade de telefone e e-mail)
+
+## Melhorias v7
+- [x] Frontend: modal de visualização somente leitura em Clientes (botão "Ver")
+- [x] Frontend: modal de visualização somente leitura em Profissionais (botão "Ver")
+- [x] Frontend: modal de visualização somente leitura em Serviços (botão "Ver")
+- [x] Documentação: atualizar fluxo dos casos de uso 5.2.1, 5.2.4 e 5.2.5 com passo de visualização
