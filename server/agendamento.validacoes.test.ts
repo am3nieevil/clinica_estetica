@@ -27,6 +27,9 @@ vi.mock("./db", () => ({
   updateServico: vi.fn().mockResolvedValue({}),
   deleteServico: vi.fn().mockResolvedValue({}),
   verificarConflitoHorario: vi.fn().mockResolvedValue(false),
+  verificarConflitoHorarioCliente: vi.fn().mockResolvedValue(false),
+  clienteTemAgendamentos: vi.fn().mockResolvedValue(false),
+  profissionalTemAgendamentos: vi.fn().mockResolvedValue(false),
   getServicosByProfissional: vi.fn().mockResolvedValue([]),
   associarServicoToProfissional: vi.fn().mockResolvedValue({}),
   removerServicoFromProfissional: vi.fn().mockResolvedValue({}),
@@ -204,6 +207,28 @@ describe("Validações de Agendamento", () => {
     );
   });
 
+  it("deve rejeitar agendamento quando cliente já possui agendamento no mesmo horário", async () => {
+    vi.mocked(db.getClienteById).mockResolvedValue(mockCliente);
+    vi.mocked(db.getProfissionalById).mockResolvedValue(mockProfissional);
+    vi.mocked(db.getServicoById).mockResolvedValue(mockServico1);
+    vi.mocked(db.getServicosByProfissional).mockResolvedValue([{ id: 1, profissionalId: 1, servicoId: 1, createdAt: new Date() }]);
+    vi.mocked(db.verificarConflitoHorario).mockResolvedValue(false);
+    vi.mocked(db.verificarConflitoHorarioCliente).mockResolvedValue(true); // cliente já tem agendamento
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const dataFutura = new Date();
+    dataFutura.setDate(dataFutura.getDate() + 1);
+
+    await expect(
+      caller.agendamentos.create({
+        clienteId: 1,
+        profissionalId: 1,
+        servicoIds: [1],
+        dataHora: dataFutura,
+      })
+    ).rejects.toThrow("já possui um agendamento neste horário");
+  });
+
   it("deve criar agendamento com múltiplos serviços somando duração e valor", async () => {
     vi.mocked(db.getClienteById).mockResolvedValue(mockCliente);
     vi.mocked(db.getProfissionalById).mockResolvedValue(mockProfissional);
@@ -216,6 +241,7 @@ describe("Validações de Agendamento", () => {
       { id: 2, profissionalId: 1, servicoId: 2, createdAt: new Date() },
     ]);
     vi.mocked(db.verificarConflitoHorario).mockResolvedValue(false);
+    vi.mocked(db.verificarConflitoHorarioCliente).mockResolvedValue(false);
 
     const caller = appRouter.createCaller(createAuthContext());
     const dataFutura = new Date();
@@ -298,6 +324,54 @@ describe("Validações de Serviço", () => {
 
     expect(resultado).toBeDefined();
     expect(db.createServico).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Exclusão de Cliente com Agendamentos", () => {
+  it("deve bloquear exclusão de cliente com agendamentos confirmados", async () => {
+    vi.mocked(db.getClienteById).mockResolvedValue(mockCliente);
+    vi.mocked(db.clienteTemAgendamentos).mockResolvedValue(true); // tem agendamentos
+
+    const caller = appRouter.createCaller(createAuthContext());
+
+    await expect(
+      caller.clientes.delete(1)
+    ).rejects.toThrow("Não é possível excluir este cliente");
+  });
+
+  it("deve permitir exclusão de cliente sem agendamentos confirmados", async () => {
+    vi.mocked(db.getClienteById).mockResolvedValue(mockCliente);
+    vi.mocked(db.clienteTemAgendamentos).mockResolvedValue(false); // sem agendamentos
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const resultado = await caller.clientes.delete(1);
+
+    expect(resultado).toBeDefined();
+    expect(db.deleteCliente).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("Exclusão de Profissional com Agendamentos", () => {
+  it("deve bloquear exclusão de profissional com agendamentos confirmados", async () => {
+    vi.mocked(db.getProfissionalById).mockResolvedValue(mockProfissional);
+    vi.mocked(db.profissionalTemAgendamentos).mockResolvedValue(true); // tem agendamentos
+
+    const caller = appRouter.createCaller(createAuthContext());
+
+    await expect(
+      caller.profissionais.delete(1)
+    ).rejects.toThrow("Não é possível excluir este profissional");
+  });
+
+  it("deve permitir exclusão de profissional sem agendamentos confirmados", async () => {
+    vi.mocked(db.getProfissionalById).mockResolvedValue(mockProfissional);
+    vi.mocked(db.profissionalTemAgendamentos).mockResolvedValue(false); // sem agendamentos
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const resultado = await caller.profissionais.delete(1);
+
+    expect(resultado).toBeDefined();
+    expect(db.deleteProfissional).toHaveBeenCalledWith(1);
   });
 });
 
