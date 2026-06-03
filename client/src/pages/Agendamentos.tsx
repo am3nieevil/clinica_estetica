@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Search, Loader2, Trash2, Edit, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Plus, Search, Loader2, Trash2, Edit, CheckCircle, XCircle, Clock, Eye, User, Scissors, Calendar, MessageSquare, DollarSign } from "lucide-react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -13,12 +14,38 @@ import DashboardLayout from "@/components/DashboardLayout";
 
 type StatusType = "confirmado" | "cancelado" | "concluido";
 
+type Servico = {
+  servicoId: number | null;
+  servicoNome: string | null;
+  servicoValor: string | null;
+  servicoDuracao: number | null;
+};
+
+type Agendamento = {
+  id: number;
+  dataHora: Date;
+  duracao: number;
+  valorTotal: string | null;
+  status: string;
+  notas: string | null;
+  clienteId: number | null;
+  profissionalId: number | null;
+  clienteNome: string | null;
+  clienteTelefone: string | null;
+  profissionalNome: string | null;
+  profissionalEspecialidade: string | null;
+  servicos: Servico[];
+  servicoNome: string;
+  servicoValor: string | null;
+};
+
 export default function Agendamentos() {
   const [, navigate] = useLocation();
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [editando, setEditando] = useState<number | null>(null);
   const [novoStatus, setNovoStatus] = useState<StatusType>("confirmado");
+  const [viewAgendamento, setViewAgendamento] = useState<Agendamento | null>(null);
 
   const utils = trpc.useUtils();
   const { data: agendamentos = [], isLoading } = trpc.agendamentos.list.useQuery();
@@ -40,7 +67,7 @@ export default function Agendamentos() {
     onError: (err) => toast.error(err.message),
   });
 
-  const agendamentosFiltrados = agendamentos.filter((a) => {
+  const agendamentosFiltrados = (agendamentos as Agendamento[]).filter((a) => {
     const matchBusca =
       (a.clienteNome ?? "").toLowerCase().includes(busca.toLowerCase()) ||
       (a.servicoNome ?? "").toLowerCase().includes(busca.toLowerCase()) ||
@@ -66,6 +93,13 @@ export default function Agendamentos() {
   const salvarStatus = () => {
     if (editando === null) return;
     updateMutation.mutate({ id: editando, status: novoStatus });
+  };
+
+  const formatarDuracao = (minutos: number) => {
+    if (minutos < 60) return `${minutos} min`;
+    const h = Math.floor(minutos / 60);
+    const m = minutos % 60;
+    return m > 0 ? `${h}h ${m}min` : `${h}h`;
   };
 
   return (
@@ -140,12 +174,12 @@ export default function Agendamentos() {
                         </div>
                         <div className="mt-1 text-sm text-muted-foreground flex gap-3 flex-wrap">
                           <span className="font-medium text-foreground">{ag.clienteNome ?? "—"}</span>
-                          <span>• {ag.servicoNome ?? "—"}</span>
-                          <span>• {ag.duracao} min</span>
+                          <span>• {ag.servicoNome || "—"}</span>
+                          <span>• {formatarDuracao(ag.duracao)}</span>
                           {ag.profissionalNome && <span>• {ag.profissionalNome}</span>}
-                          {ag.servicoValor && (
+                          {ag.valorTotal && (
                             <span className="text-primary font-medium">
-                              • R$ {parseFloat(ag.servicoValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                              • R$ {parseFloat(ag.valorTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                             </span>
                           )}
                         </div>
@@ -154,6 +188,14 @@ export default function Agendamentos() {
                         )}
                       </div>
                       <div className="flex gap-1 ml-3">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setViewAgendamento(ag)}
+                          title="Visualizar detalhes"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -195,6 +237,135 @@ export default function Agendamentos() {
             )}
           </CardContent>
         </Card>
+
+        {/* Modal de visualização detalhada */}
+        <Dialog open={!!viewAgendamento} onOpenChange={(open) => { if (!open) setViewAgendamento(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-primary" />
+                Detalhes do Agendamento
+              </DialogTitle>
+            </DialogHeader>
+
+            {viewAgendamento && (() => {
+              const ag = viewAgendamento;
+              const dataHora = new Date(ag.dataHora);
+              return (
+                <div className="space-y-4 py-2">
+                  {/* Status e data */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="w-4 h-4" />
+                      <span className="font-semibold text-foreground text-base">
+                        {dataHora.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+                      </span>
+                    </div>
+                    {getStatusBadge(ag.status)}
+                  </div>
+                  <p className="text-sm text-muted-foreground -mt-2 ml-6">
+                    às {dataHora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} • duração total: {formatarDuracao(ag.duracao)}
+                  </p>
+
+                  <Separator />
+
+                  {/* Cliente */}
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <User className="w-3 h-3" /> Cliente
+                    </p>
+                    <p className="font-medium text-foreground">{ag.clienteNome ?? "—"}</p>
+                    {ag.clienteTelefone && (
+                      <p className="text-sm text-muted-foreground">{ag.clienteTelefone}</p>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Profissional */}
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <Scissors className="w-3 h-3" /> Profissional
+                    </p>
+                    <p className="font-medium text-foreground">{ag.profissionalNome ?? "—"}</p>
+                    {ag.profissionalEspecialidade && (
+                      <p className="text-sm text-muted-foreground">{ag.profissionalEspecialidade}</p>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Procedimentos */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <Scissors className="w-3 h-3" /> Procedimentos
+                    </p>
+                    {ag.servicos && ag.servicos.length > 0 ? (
+                      <div className="space-y-2">
+                        {ag.servicos.map((s, idx) => (
+                          <div key={idx} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{s.servicoNome ?? "—"}</p>
+                              {s.servicoDuracao && (
+                                <p className="text-xs text-muted-foreground">{formatarDuracao(s.servicoDuracao)}</p>
+                              )}
+                            </div>
+                            {s.servicoValor && (
+                              <span className="text-sm font-semibold text-primary">
+                                R$ {parseFloat(s.servicoValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                        {/* Total */}
+                        {ag.valorTotal && (
+                          <div className="flex items-center justify-between px-3 py-2 rounded-md border border-primary/20 bg-primary/5">
+                            <span className="text-sm font-semibold flex items-center gap-1">
+                              <DollarSign className="w-4 h-4 text-primary" />
+                              Total
+                            </span>
+                            <span className="text-base font-bold text-primary">
+                              R$ {parseFloat(ag.valorTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Nenhum procedimento registrado.</p>
+                    )}
+                  </div>
+
+                  {/* Observações */}
+                  {ag.notas && (
+                    <>
+                      <Separator />
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                          <MessageSquare className="w-3 h-3" /> Observações
+                        </p>
+                        <p className="text-sm text-foreground italic">{ag.notas}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setViewAgendamento(null)}>Fechar</Button>
+              {viewAgendamento && (
+                <Button onClick={() => {
+                  const ag = viewAgendamento;
+                  setViewAgendamento(null);
+                  abrirEdicao(ag.id, ag.status as StatusType);
+                }} className="gap-2">
+                  <Edit className="w-4 h-4" />
+                  Alterar Status
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Modal de edição de status */}
         <Dialog open={editando !== null} onOpenChange={(open) => !open && setEditando(null)}>
