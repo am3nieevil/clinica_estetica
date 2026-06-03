@@ -251,10 +251,14 @@ export async function getAgendamentoById(id: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function createAgendamento(data: InsertAgendamento) {
+export async function createAgendamento(data: InsertAgendamento): Promise<{ insertId: number } | undefined> {
   const db = await getDb();
   if (!db) return undefined;
-  return await db.insert(agendamentos).values(data);
+  // Drizzle MySQL2: insert retorna [ResultSetHeader, FieldPacket[]]
+  // ResultSetHeader tem insertId
+  const result = await db.insert(agendamentos).values(data) as unknown as [{ insertId: number }, unknown];
+  const insertId = result[0]?.insertId ?? 0;
+  return { insertId };
 }
 
 export async function updateAgendamento(id: number, data: Partial<InsertAgendamento>) {

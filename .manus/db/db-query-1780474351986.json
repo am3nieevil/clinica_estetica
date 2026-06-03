@@ -1,0 +1,26 @@
+{
+  "query": "SELECT id, clienteId, profissionalId, status, valorTotal, duracao FROM agendamentos LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3DFiUs8MGjxE3AC.03610147ffbd --database DY4SAarzxvBtuKYcNeA23D --execute SELECT id, clienteId, profissionalId, status, valorTotal, duracao FROM agendamentos LIMIT 10;",
+  "rows": [
+    {
+      "id": "390001",
+      "clienteId": "270001",
+      "profissionalId": "240002",
+      "status": "confirmado",
+      "valorTotal": "200.00",
+      "duracao": "30"
+    },
+    {
+      "id": "420001",
+      "clienteId": "240001",
+      "profissionalId": "240002",
+      "status": "confirmado",
+      "valorTotal": "44944.00",
+      "duracao": "220"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tclienteId\tprofissionalId\tstatus\tvalorTotal\tduracao\n390001\t270001\t240002\tconfirmado\t200.00\t30\n420001\t240001\t240002\tconfirmado\t44944.00\t220\n",
+  "stderr": "",
+  "execution_time_ms": 269
+}

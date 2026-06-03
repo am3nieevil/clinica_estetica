@@ -344,11 +344,9 @@ export const appRouter = router({
         });
 
         // Associa os serviços ao agendamento
-        if (result) {
-          const insertId = (result as any).insertId as number;
-          if (insertId) {
-            await db.addServicosToAgendamento(insertId, input.servicoIds);
-          }
+        const agId = (result as unknown as { insertId: number } | undefined)?.insertId;
+        if (agId) {
+          await db.addServicosToAgendamento(agId, input.servicoIds);
         }
 
         return result;
