@@ -240,6 +240,14 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const existe = await db.getServicoById(input);
         if (!existe) throw new TRPCError({ code: "NOT_FOUND", message: "Serviço não encontrado." });
+        // ✅ Validação: não pode excluir serviço com agendamentos confirmados
+        const temAgendamentos = await db.servicoTemAgendamentos(input);
+        if (temAgendamentos) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Não é possível excluir este serviço pois ele está vinculado a agendamentos confirmados. Cancele ou conclua os agendamentos antes de excluir.",
+          });
+        }
         return db.deleteServico(input);
       }),
   }),

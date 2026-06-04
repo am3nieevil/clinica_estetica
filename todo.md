@@ -89,3 +89,12 @@
 - [x] Frontend: modal de visualização somente leitura em Profissionais (botão "Ver")
 - [x] Frontend: modal de visualização somente leitura em Serviços (botão "Ver")
 - [x] Documentação: atualizar fluxo dos casos de uso 5.2.1, 5.2.4 e 5.2.5 com passo de visualização
+
+## Correções v8
+- [x] Backend: bloquear exclusão de serviço quando vinculado a agendamentos confirmados
+- [x] Testes: cobrir bloqueio de exclusão de serviço com agendamentos
+
+## Correções v9
+- [x] Bug: verificação de duplicidade de email/telefone em profissionais deve ignorar registros inativos (soft-deleted)
+- [x] Bug: verificação de duplicidade de email/telefone em clientes deve ignorar registros inativos (soft-deleted)
+- [x] Banco: remover constraints UNIQUE de email/telefone (unicidade agora validada no backend apenas entre ativos)

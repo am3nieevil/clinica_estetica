@@ -111,23 +111,23 @@ export async function getClienteById(id: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// Verificar se telefone já existe em clientes (excluindo o próprio registro ao editar)
+// Verificar se telefone já existe em clientes (excluindo o próprio registro ao editar e registros inativos)
 export async function clienteTelefoneExiste(telefone: string, excludeId?: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
   const result = await db.select({ id: clientes.id }).from(clientes)
-    .where(eq(clientes.telefone, telefone)).limit(1);
+    .where(and(eq(clientes.telefone, telefone), eq(clientes.ativo, true))).limit(1);
   if (result.length === 0) return false;
   if (excludeId && result[0].id === excludeId) return false;
   return true;
 }
 
-// Verificar se email já existe em clientes (excluindo o próprio registro ao editar)
+// Verificar se email já existe em clientes (excluindo o próprio registro ao editar e registros inativos)
 export async function clienteEmailExiste(email: string, excludeId?: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
   const result = await db.select({ id: clientes.id }).from(clientes)
-    .where(eq(clientes.email, email)).limit(1);
+    .where(and(eq(clientes.email, email), eq(clientes.ativo, true))).limit(1);
   if (result.length === 0) return false;
   if (excludeId && result[0].id === excludeId) return false;
   return true;
@@ -151,23 +151,23 @@ export async function deleteCliente(id: number) {
   return await db.update(clientes).set({ ativo: false }).where(eq(clientes.id, id));
 }
 
-// Verificar se telefone já existe em profissionais (excluindo o próprio registro ao editar)
+// Verificar se telefone já existe em profissionais (excluindo o próprio registro ao editar e registros inativos)
 export async function profissionalTelefoneExiste(telefone: string, excludeId?: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
   const result = await db.select({ id: profissionais.id }).from(profissionais)
-    .where(eq(profissionais.telefone, telefone)).limit(1);
+    .where(and(eq(profissionais.telefone, telefone), eq(profissionais.ativo, true))).limit(1);
   if (result.length === 0) return false;
   if (excludeId && result[0].id === excludeId) return false;
   return true;
 }
 
-// Verificar se email já existe em profissionais (excluindo o próprio registro ao editar)
+// Verificar se email já existe em profissionais (excluindo o próprio registro ao editar e registros inativos)
 export async function profissionalEmailExiste(email: string, excludeId?: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
   const result = await db.select({ id: profissionais.id }).from(profissionais)
-    .where(eq(profissionais.email, email)).limit(1);
+    .where(and(eq(profissionais.email, email), eq(profissionais.ativo, true))).limit(1);
   if (result.length === 0) return false;
   if (excludeId && result[0].id === excludeId) return false;
   return true;
@@ -367,6 +367,25 @@ export async function getProfissionaisByServicos(servicoIds: number[]) {
     );
     return servicoIds.every((id) => servicosDoProf.has(id));
   });
+}
+
+// Verificar se um serviço possui agendamentos ativos (para bloquear exclusão)
+export async function servicoTemAgendamentos(servicoId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  // Busca na tabela agendamento_servicos se há algum agendamento confirmado usando este serviço
+  const result = await db
+    .select({ id: agendamentoServicos.id })
+    .from(agendamentoServicos)
+    .innerJoin(agendamentos, eq(agendamentoServicos.agendamentoId, agendamentos.id))
+    .where(
+      and(
+        eq(agendamentoServicos.servicoId, servicoId),
+        eq(agendamentos.status, "confirmado")
+      )
+    )
+    .limit(1);
+  return result.length > 0;
 }
 
 // Verificar se um cliente possui agendamentos ativos (para bloquear exclusão)

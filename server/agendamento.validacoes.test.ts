@@ -30,6 +30,7 @@ vi.mock("./db", () => ({
   verificarConflitoHorarioCliente: vi.fn().mockResolvedValue(false),
   clienteTemAgendamentos: vi.fn().mockResolvedValue(false),
   profissionalTemAgendamentos: vi.fn().mockResolvedValue(false),
+  servicoTemAgendamentos: vi.fn().mockResolvedValue(false),
   clienteTelefoneExiste: vi.fn().mockResolvedValue(false),
   clienteEmailExiste: vi.fn().mockResolvedValue(false),
   profissionalTelefoneExiste: vi.fn().mockResolvedValue(false),
@@ -467,6 +468,30 @@ describe("Unicidade de Telefone e E-mail em Profissionais", () => {
         email: "duplicado@email.com",
       })
     ).rejects.toThrow("Já existe outro profissional cadastrado com este e-mail");
+  });
+});
+
+describe("Exclusão de Serviço com Agendamentos", () => {
+  it("deve bloquear exclusão de serviço com agendamentos confirmados", async () => {
+    vi.mocked(db.getServicoById).mockResolvedValue(mockServico1);
+    vi.mocked(db.servicoTemAgendamentos).mockResolvedValue(true); // tem agendamentos
+
+    const caller = appRouter.createCaller(createAuthContext());
+
+    await expect(
+      caller.servicos.delete(1)
+    ).rejects.toThrow("Não é possível excluir este serviço");
+  });
+
+  it("deve permitir exclusão de serviço sem agendamentos confirmados", async () => {
+    vi.mocked(db.getServicoById).mockResolvedValue(mockServico1);
+    vi.mocked(db.servicoTemAgendamentos).mockResolvedValue(false); // sem agendamentos
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const resultado = await caller.servicos.delete(1);
+
+    expect(resultado).toBeDefined();
+    expect(db.deleteServico).toHaveBeenCalledWith(1);
   });
 });
 

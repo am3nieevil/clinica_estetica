@@ -1,8 +1,0 @@
-{
-  "query": "\nALTER TABLE clientes\n  ADD COLUMN rua VARCHAR(255) NULL AFTER dataNascimento,\n  ADD COLUMN numero VARCHAR(20) NULL AFTER rua,\n  ADD COLUMN bairro VARCHAR(100) NULL AFTER numero,\n  ADD COLUMN uf VARCHAR(2) NULL AFTER cidade;\n\nALTER TABLE profissionais\n  ADD COLUMN rua VARCHAR(255) NULL AFTER email,\n  ADD COLUMN numero VARCHAR(20) NULL AFTER rua,\n  ADD COLUMN bairro VARCHAR(100) NULL AFTER numero,\n  ADD COLUMN uf VARCHAR(2) NULL AFTER cidade,\n  MODIFY COLUMN cidade VARCHAR(100) NULL;\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3DFiUs8MGjxE3AC.03610147ffbd --database DY4SAarzxvBtuKYcNeA23D --execute \nALTER TABLE clientes\n  ADD COLUMN rua VARCHAR(255) NULL AFTER dataNascimento,\n  ADD COLUMN numero VARCHAR(20) NULL AFTER rua,\n  ADD COLUMN bairro VARCHAR(100) NULL AFTER numero,\n  ADD COLUMN uf VARCHAR(2) NULL AFTER cidade;\n\nALTER TABLE profissionais\n  ADD COLUMN rua VARCHAR(255) NULL AFTER email,\n  ADD COLUMN numero VARCHAR(20) NULL AFTER rua,\n  ADD COLUMN bairro VARCHAR(100) NULL AFTER numero,\n  ADD COLUMN uf VARCHAR(2) NULL AFTER cidade,\n  MODIFY COLUMN cidade VARCHAR(100) NULL;\n",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1054 (42S22) at line 2: Unknown column 'rua' in 'clientes'"
-  ]
-}

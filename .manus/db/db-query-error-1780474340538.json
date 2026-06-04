@@ -1,8 +1,0 @@
-{
-  "query": "SELECT a.id as agendamento_id, a.status, c.nome as cliente, p.nome as profissional, a.valorTotal, COUNT(ags.id) as qtd_servicos FROM agendamentos a LEFT JOIN clientes c ON a.clienteId = c.id LEFT JOIN profissionais p ON a.profissionalId = p.id LEFT JOIN agendamento_servicos ags ON a.id = ags.agendamentoId GROUP BY a.id LIMIT 10;",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3DFiUs8MGjxE3AC.03610147ffbd --database DY4SAarzxvBtuKYcNeA23D --execute SELECT a.id as agendamento_id, a.status, c.nome as cliente, p.nome as profissional, a.valorTotal, COUNT(ags.id) as qtd_servicos FROM agendamentos a LEFT JOIN clientes c ON a.clienteId = c.id LEFT JOIN profissionais p ON a.profissionalId = p.id LEFT JOIN agendamento_servicos ags ON a.id = ags.agendamentoId GROUP BY a.id LIMIT 10;",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1055 (42000) at line 1: Expression #3 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'DY4SAarzxvBtuKYcNeA23D.c.nome' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by"
-  ]
-}

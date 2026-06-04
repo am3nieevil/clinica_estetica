@@ -30,8 +30,8 @@ export type InsertUser = typeof users.$inferInsert;
 export const clientes = mysqlTable("clientes", {
   id: int("id").autoincrement().primaryKey(),
   nome: varchar("nome", { length: 255 }).notNull(),
-  email: varchar("email", { length: 320 }).unique(),
-  telefone: varchar("telefone", { length: 20 }).notNull().unique(),
+  email: varchar("email", { length: 320 }),
+  telefone: varchar("telefone", { length: 20 }).notNull(),
   dataNascimento: timestamp("dataNascimento"),
   rua: varchar("rua", { length: 255 }),
   numero: varchar("numero", { length: 20 }),
@@ -51,8 +51,8 @@ export const profissionais = mysqlTable("profissionais", {
   id: int("id").autoincrement().primaryKey(),
   nome: varchar("nome", { length: 255 }).notNull(),
   especialidade: varchar("especialidade", { length: 255 }).notNull(),
-  telefone: varchar("telefone", { length: 20 }).notNull().unique(),
-  email: varchar("email", { length: 320 }).unique(),
+  telefone: varchar("telefone", { length: 20 }).notNull(),
+  email: varchar("email", { length: 320 }),
   rua: varchar("rua", { length: 255 }),
   numero: varchar("numero", { length: 20 }),
   bairro: varchar("bairro", { length: 100 }),
@@ -99,7 +99,7 @@ export const agendamentos = mysqlTable("agendamentos", {
   profissionalId: int("profissionalId").notNull(),
   dataHora: timestamp("dataHora").notNull(),
   duracao: int("duracao").notNull(), // soma das durações dos serviços, em minutos
-  valorTotal: decimal("valorTotal", { precision: 10, scale: 2 }), // soma dos valores dos serviços
+  valorTotal: decimal("valorTotal", { precision: 10, scale: 2 }).notNull(), // soma dos valores dos serviços
   status: mysqlEnum("status", ["confirmado", "cancelado", "concluido"]).default("confirmado").notNull(),
   notas: text("notas"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

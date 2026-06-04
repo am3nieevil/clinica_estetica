@@ -41,6 +41,7 @@ interface FormData {
   nome: string;
   telefone: string;
   email: string;
+  dataNascimento: string;
   rua: string;
   numero: string;
   bairro: string;
@@ -49,7 +50,7 @@ interface FormData {
 }
 
 const emptyForm: FormData = {
-  nome: "", telefone: "", email: "",
+  nome: "", telefone: "", email: "", dataNascimento: "",
   rua: "", numero: "", bairro: "", cidade: "", uf: "",
 };
 
@@ -130,6 +131,7 @@ export default function Clientes() {
       nome: formData.nome.trim(),
       telefone: formData.telefone.trim(),
       email: formData.email.trim() || undefined,
+      dataNascimento: formData.dataNascimento ? new Date(formData.dataNascimento) : undefined,
       rua: formData.rua.trim() || undefined,
       numero: formData.numero.trim() || undefined,
       bairro: formData.bairro.trim() || undefined,
@@ -146,10 +148,12 @@ export default function Clientes() {
 
   const handleEdit = (cliente: typeof clientes[0]) => {
     setEditId(cliente.id);
+    const dn = (cliente as any).dataNascimento;
     setFormData({
       nome: cliente.nome,
       telefone: cliente.telefone,
       email: cliente.email ?? "",
+      dataNascimento: dn ? new Date(dn).toISOString().split("T")[0] : "",
       rua: (cliente as any).rua ?? "",
       numero: (cliente as any).numero ?? "",
       bairro: (cliente as any).bairro ?? "",
@@ -232,7 +236,7 @@ export default function Clientes() {
                 </div>
               </div>
 
-              {/* E-mail e Cidade */}
+              {/* E-mail e Data de Nascimento */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">E-mail</label>
@@ -254,21 +258,32 @@ export default function Clientes() {
                   )}
                 </div>
                 <div>
-                  <label className="text-sm font-medium flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5" /> Cidade
-                  </label>
-                  <div className="mt-1">
-                    <CidadeSelect
-                      value={cidadeValue}
-                      onChange={(val) =>
-                        setFormData({
-                          ...formData,
-                          cidade: val?.cidade ?? "",
-                          uf: val?.uf ?? "",
-                        })
-                      }
-                    />
-                  </div>
+                  <label className="text-sm font-medium">Data de Nascimento</label>
+                  <Input
+                    type="date"
+                    value={formData.dataNascimento}
+                    onChange={(e) => setFormData({ ...formData, dataNascimento: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              {/* Cidade */}
+              <div>
+                <label className="text-sm font-medium flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5" /> Cidade
+                </label>
+                <div className="mt-1">
+                  <CidadeSelect
+                    value={cidadeValue}
+                    onChange={(val) =>
+                      setFormData({
+                        ...formData,
+                        cidade: val?.cidade ?? "",
+                        uf: val?.uf ?? "",
+                      })
+                    }
+                  />
                 </div>
               </div>
 

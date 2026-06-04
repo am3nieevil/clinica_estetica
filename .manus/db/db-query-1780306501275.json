@@ -1,9 +1,0 @@
-{
-  "query": "\nALTER TABLE clientes ADD CONSTRAINT uq_clientes_telefone UNIQUE (telefone);\nALTER TABLE clientes ADD CONSTRAINT uq_clientes_email UNIQUE (email);\nALTER TABLE profissionais ADD CONSTRAINT uq_profissionais_telefone UNIQUE (telefone);\nALTER TABLE profissionais ADD CONSTRAINT uq_profissionais_email UNIQUE (email);\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3DFiUs8MGjxE3AC.03610147ffbd --database DY4SAarzxvBtuKYcNeA23D --execute \nALTER TABLE clientes ADD CONSTRAINT uq_clientes_telefone UNIQUE (telefone);\nALTER TABLE clientes ADD CONSTRAINT uq_clientes_email UNIQUE (email);\nALTER TABLE profissionais ADD CONSTRAINT uq_profissionais_telefone UNIQUE (telefone);\nALTER TABLE profissionais ADD CONSTRAINT uq_profissionais_email UNIQUE (email);\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 1541
-}

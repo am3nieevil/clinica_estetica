@@ -1,9 +1,0 @@
-{
-  "query": "\n-- Remover clientes duplicados por telefone, mantendo o de maior id\nDELETE c1 FROM clientes c1\nINNER JOIN clientes c2\nWHERE c1.telefone = c2.telefone AND c1.id < c2.id;\n\n-- Remover clientes duplicados por email (não nulo), mantendo o de maior id\nDELETE c1 FROM clientes c1\nINNER JOIN clientes c2\nWHERE c1.email IS NOT NULL AND c1.email = c2.email AND c1.id < c2.id;\n\n-- Remover profissionais duplicados por telefone, mantendo o de maior id\nDELETE p1 FROM profissionais p1\nINNER JOIN profissionais p2\nWHERE p1.telefone = p2.telefone AND p1.id < p2.id;\n\n-- Remover profissionais duplicados por email (não nulo), mantendo o de maior id\nDELETE p1 FROM profissionais p1\nINNER JOIN profissionais p2\nWHERE p1.email IS NOT NULL AND p1.email = p2.email AND p1.id < p2.id;\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3DFiUs8MGjxE3AC.03610147ffbd --database DY4SAarzxvBtuKYcNeA23D --execute \n-- Remover clientes duplicados por telefone, mantendo o de maior id\nDELETE c1 FROM clientes c1\nINNER JOIN clientes c2\nWHERE c1.telefone = c2.telefone AND c1.id < c2.id;\n\n-- Remover clientes duplicados por email (não nulo), mantendo o de maior id\nDELETE c1 FROM clientes c1\nINNER JOIN clientes c2\nWHERE c1.email IS NOT NULL AND c1.email = c2.email AND c1.id < c2.id;\n\n-- Remover profissionais duplicados por telefone, mantendo o de maior id\nDELETE p1 FROM profissionais p1\nINNER JOIN profissionais p2\nWHERE p1.telefone = p2.telefone AND p1.id < p2.id;\n\n-- Remover profissionais duplicados por email (não nulo), mantendo o de maior id\nDELETE p1 FROM profissionais p1\nINNER JOIN profissionais p2\nWHERE p1.email IS NOT NULL AND p1.email = p2.email AND p1.id < p2.id;\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 317
-}
